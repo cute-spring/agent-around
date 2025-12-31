@@ -31,6 +31,9 @@
 - [4-tool-calling.js](file:///Users/gavinzhang/ws-ai-recharge-2026/agent-around/examples/02-advanced/4-tool-calling.js): 基础工具调用。
 - [6-multi-step-agent.js](file:///Users/gavinzhang/ws-ai-recharge-2026/agent-around/examples/02-advanced/6-multi-step-agent.js): **自主 Agent**，自动处理“思考-执行”闭环。
 - [11-collaborative-agents.js](file:///Users/gavinzhang/ws-ai-recharge-2026/agent-around/examples/02-advanced/11-collaborative-agents.js): 多模型流水线协作（Writer + Reviewer）。
+- [14-reasoning-deepseek.js](file:///Users/gavinzhang/ws-ai-recharge-2026/agent-around/examples/02-advanced/14-reasoning-deepseek.js): **深度思考**，提取 DeepSeek-R1 的思考过程。
+- [15-mcp-integration.js](file:///Users/gavinzhang/ws-ai-recharge-2026/agent-around/examples/02-advanced/15-mcp-integration.js): **MCP 协议**，标准化插件集成概念。
+- [16-middleware.js](file:///Users/gavinzhang/ws-ai-recharge-2026/agent-around/examples/02-advanced/16-middleware.js): **SDK 中间件**，实现 AOP 全局拦截与治理。
 
 ### 03. 多模态 (Multimodal)
 - [7-vision-multimodal.js](file:///Users/gavinzhang/ws-ai-recharge-2026/agent-around/examples/03-multimodal/7-vision-multimodal.js): 视觉图片分析。
