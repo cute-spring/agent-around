@@ -32,8 +32,11 @@
 - [6-multi-step-agent.js](file:///Users/gavinzhang/ws-ai-recharge-2026/agent-around/examples/02-advanced/6-multi-step-agent.js): **自主 Agent**，自动处理“思考-执行”闭环。
 - [11-collaborative-agents.js](file:///Users/gavinzhang/ws-ai-recharge-2026/agent-around/examples/02-advanced/11-collaborative-agents.js): 多模型流水线协作（Writer + Reviewer）。
 - [14-reasoning-deepseek.js](file:///Users/gavinzhang/ws-ai-recharge-2026/agent-around/examples/02-advanced/14-reasoning-deepseek.js): **深度思考**，提取 DeepSeek-R1 的思考过程。
-- [15-mcp-integration.js](file:///Users/gavinzhang/ws-ai-recharge-2026/agent-around/examples/02-advanced/15-mcp-integration.js): **MCP 协议**，标准化插件集成概念。
+- [15-mcp-integration.js](file:///Users/gavinzhang/ws-ai-recharge-2026/agent-around/examples/02-advanced/15-mcp-integration.js): **MCP 协议集成**，实现工具动态转换与手动调用回退机制。
 - [16-middleware.js](file:///Users/gavinzhang/ws-ai-recharge-2026/agent-around/examples/02-advanced/16-middleware.js): **SDK 中间件**，实现 AOP 全局拦截与治理。
+- [17-human-in-the-loop.js](file:///Users/gavinzhang/ws-ai-recharge-2026/agent-around/examples/02-advanced/17-human-in-the-loop.js): **人工介入 (HITL)**，在执行敏感工具前请求人工确认。
+- [18-memory-persistence.js](file:///Users/gavinzhang/ws-ai-recharge-2026/agent-around/examples/02-advanced/18-memory-persistence.js): **记忆持久化**，将对话上下文保存至本地文件以实现跨会话记忆。
+- [19-semantic-routing.js](file:///Users/gavinzhang/ws-ai-recharge-2026/agent-around/examples/02-advanced/19-semantic-routing.js): **语义路由**，利用向量相似度将用户请求精准分发至不同的处理逻辑。
 
 ### 03. 多模态 (Multimodal)
 - [7-vision-multimodal.js](file:///Users/gavinzhang/ws-ai-recharge-2026/agent-around/examples/03-multimodal/7-vision-multimodal.js): 视觉图片分析。
