@@ -21,18 +21,27 @@ async function main() {
       prompt: '为什么天空是蓝色的？请先进行深度思考，然后给出简短回答。',
     });
 
-    // 核心价值：SDK 自动解析并分离了 reasoning 文本
-    const { text, reasoning } = result;
+    // 核心价值：SDK 尝试解析并分离 reasoning 文本
+    const { text, reasoningText } = result;
 
-    if (reasoning) {
+    if (reasoningText) {
       console.log('\n--- 🧠 思考过程 (Reasoning) ---');
-      console.log(reasoning);
+      console.log(reasoningText);
     } else {
-      console.log('\n(当前模型未返回独立的思考过程数据)');
+      console.log('\n(提示：当前环境未返回独立的 reasoningText，可能需要 SDK 或模型提供商支持)');
+      // 兼容性处理：尝试从文本中手动提取 <think> 标签内容
+      const thinkMatch = text.match(/<think>([\s\S]*?)<\/think>/);
+      if (thinkMatch) {
+        console.log('\n--- 🧠 思考过程 (从文本中提取) ---');
+        console.log(thinkMatch[1].trim());
+      }
     }
 
+    // 移除文本中的 <think> 部分以获得纯净的回答
+    const cleanText = text.replace(/<think>[\s\S]*?<\/think>/, '').trim();
+
     console.log('\n--- ✨ 最终回答 ---');
-    console.log(text);
+    console.log(cleanText);
 
   } catch (error) {
     console.error('\n执行失败:', error.message);

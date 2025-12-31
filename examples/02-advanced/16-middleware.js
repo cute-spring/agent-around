@@ -10,7 +10,7 @@
  * 3. 性能监控与自定义日志。
  */
 
-const { generateText, experimental_wrapLanguageModel: wrapLanguageModel } = require('ai');
+const { generateText, wrapLanguageModel } = require('ai');
 const { ollama } = require('ai-sdk-ollama');
 
 async function main() {
@@ -22,12 +22,12 @@ async function main() {
       return wrapLanguageModel({
         model,
         middleware: {
-          doGenerate: async ({ model, params, next }) => {
-            console.log('\n[中间件] 🚀 准备发送请求到模型...');
-            console.log(`[中间件] 目标模型: ${model.modelId}`);
+          wrapGenerate: async ({ doGenerate, params, model: modelArg }) => {
+            console.log('\n[中间件] 🛰️  正在调用 wrapGenerate...');
+            console.log(`[中间件] 目标模型: ${modelArg.modelId}`);
             
             const start = Date.now();
-            const result = await next();
+            const result = await doGenerate();
             const duration = Date.now() - start;
 
             console.log(`[中间件] ✅ 响应已接收，耗时: ${duration}ms`);
