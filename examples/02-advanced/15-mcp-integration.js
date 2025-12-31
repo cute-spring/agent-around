@@ -1,52 +1,182 @@
-/**
- * 示例 15: MCP (Model Context Protocol) 集成
- * 
- * 核心价值：标准化插件生态 (Standardized Ecosystem)
- * MCP 是由 Anthropic 发起的协议，旨在让 AI 能够通过统一的标准连接各种工具。
- * 以前你需要为每个工具写适配器，现在只需接入一个 MCP Server。
- */
-
-const { generateText } = require('ai');
+const { Client } = require('@modelcontextprotocol/sdk/client/index.js');
+const { StreamableHTTPClientTransport } = require('@modelcontextprotocol/sdk/client/streamableHttp.js');
+const { z } = require('zod');
+const { generateText, tool } = require('ai');
 const { ollama } = require('ai-sdk-ollama');
-// 注意：在实际项目中需要安装 @modelcontextprotocol/sdk
-// 这里作为概念展示 SDK v6 如何通过工具化思路接入 MCP 理念
+require('dotenv').config();
 
-async function main() {
-  console.log('--- 示例 15: MCP 协议集成概念演示 ---');
-
-  /**
-   * 场景说明：
-   * 假设我们有一个 MCP Server 提供了 "fetch_github_stars" 功能。
-   * SDK v6 允许我们将 MCP 暴露出来的 tools 直接解构到 generateText 中。
-   */
-
-  const result = await generateText({
-    model: ollama('qwen2.5-coder:latest'),
-    prompt: '查询一下 vercel/ai 这个仓库在 GitHub 上有多少 star？',
-    
-    // 核心价值：MCP Tools
-    // 在真实 MCP 环境中，你会使用 mcpClient.listTools() 获取这些定义
-    tools: {
-      github_search: {
-        description: 'MCP 提供的 GitHub 搜索工具',
-        parameters: {
-          type: 'object',
-          properties: {
-            repo: { type: 'string', description: '仓库名' }
-          }
-        },
-        execute: async ({ repo }) => {
-          console.log(`\n[MCP Server 执行] 正在请求 GitHub API 查询 ${repo}...`);
-          return { stars: 85400 }; // 模拟 MCP 返回结果
+// Simple JSON Schema to Zod converter for basic types
+function jsonSchemaToZod(schema) {
+  if (!schema) return z.any();
+  
+  if (schema.type === 'object') {
+    const shape = {};
+    if (schema.properties) {
+      for (const [key, value] of Object.entries(schema.properties)) {
+        shape[key] = jsonSchemaToZod(value);
+        if (schema.required && !schema.required.includes(key)) {
+            shape[key] = shape[key].optional();
         }
       }
+    }
+    return z.object(shape).passthrough();
+  }
+  
+  if (schema.type === 'string') return z.string();
+  if (schema.type === 'number' || schema.type === 'integer') return z.number();
+  if (schema.type === 'boolean') return z.boolean();
+  if (schema.type === 'array') {
+    return z.array(jsonSchemaToZod(schema.items));
+  }
+  
+  return z.any();
+}
+
+async function main() {
+  const apiKey = process.env.ZHIPU_API_KEY;
+  if (!apiKey) {
+    console.error('ZHIPU_API_KEY is not set in .env');
+    process.exit(1);
+  }
+
+  // MCP Server Configuration
+  const mcpConfig = {
+    url: 'https://open.bigmodel.cn/api/mcp/web_search_prime/mcp',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    }
+  };
+
+  console.log('Connecting to MCP server...');
+  const transport = new StreamableHTTPClientTransport(
+    mcpConfig.url, 
+    {
+      requestInit: {
+        headers: mcpConfig.headers
+      }
+    }
+  );
+  
+  const client = new Client({
+    name: "agent-around-client",
+    version: "1.0.0",
+  }, {
+    capabilities: {
+      tools: {},
     },
-    maxSteps: 3
   });
 
-  console.log('\n--- 最终结果 ---');
-  console.log(result.text);
-  console.log('\n💡 提示：SDK v6 与 MCP 的结合让 AI 具备了无限的扩展能力，从读文件到控制智能家居。');
+  try {
+    await client.connect(transport);
+    console.log('Connected to MCP server');
+
+    // List tools
+    const mcpToolsList = await client.listTools();
+    const toolNames = mcpToolsList.tools.map(t => t.name).join(', ');
+    console.log(`Found ${mcpToolsList.tools.length} tools: ${toolNames}`);
+
+    // Optional: Manual Tool Verification (to prove MCP connection works)
+    // console.log('\n--- Verifying Tool Execution Manually ---');
+    // ... code ...
+
+    // Convert MCP tools to AI SDK tools
+    const tools = {};
+    for (const mcpTool of mcpToolsList.tools) {
+      tools[mcpTool.name] = tool({
+        description: mcpTool.description,
+        parameters: jsonSchemaToZod(mcpTool.inputSchema),
+        execute: async (args) => {
+          console.log(`[Tool] Executing ${mcpTool.name} with args:`, JSON.stringify(args));
+          const result = await client.callTool({
+              name: mcpTool.name,
+              arguments: args
+          });
+          
+          // Return the content from the tool result
+          if (result.content && result.content.length > 0) {
+              const textContent = result.content.map(c => c.text).join('\n');
+              console.log(`[Tool] Result (truncated):`, textContent.substring(0, 100) + '...');
+              return textContent;
+          }
+          return "No content returned from tool.";
+        },
+      });
+    }
+
+    // Use with AI SDK
+    console.log('\n--- Generating Text with MCP Tools ---');
+    const result = await generateText({
+      model: ollama('qwen2.5-coder:latest'), 
+      tools: tools,
+      maxSteps: 5,
+      // Explicitly instructing the model to use the tool correctly can help with smaller models
+      prompt: 'Use the "webSearchPrime" tool to search for "DeepSeek latest news". Make sure to use the correct parameter "search_query".',
+    });
+
+    console.log('\nFinal Answer:\n', result.text);
+
+    // Fallback: If the tool wasn't executed automatically but the text contains a tool call JSON
+    if (result.toolCalls.length === 0) {
+        console.log('\n[Fallback] Checking if model generated tool call JSON...');
+        try {
+            // Attempt to find JSON block in the text
+            const jsonMatch = result.text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                const potentialToolCall = JSON.parse(jsonMatch[0]);
+                if (potentialToolCall.name && potentialToolCall.arguments) {
+                    console.log(`[Fallback] Detected manual tool call for ${potentialToolCall.name}`);
+                    const toolName = potentialToolCall.name;
+                    const toolArgs = potentialToolCall.arguments;
+                    
+                    if (tools[toolName]) {
+                        console.log(`[Fallback] Executing ${toolName} manually...`);
+                        const manualResult = await client.callTool({
+                            name: toolName,
+                            arguments: toolArgs
+                        });
+                        
+                        if (manualResult.content && manualResult.content.length > 0) {
+                             const textContent = manualResult.content.map(c => c.text).join('\n');
+                             console.log('\n--- Manual Tool Execution Result ---');
+                             try {
+                                 // The content might be a JSON string wrapped in quotes, or double-stringified
+                                 let parsedContent = textContent;
+                                 if (typeof textContent === 'string') {
+                                     try {
+                                         parsedContent = JSON.parse(textContent);
+                                     } catch (e) {
+                                         // ignore
+                                     }
+                                 }
+                                 // If it was double stringified (e.g. "[...]" inside a string), parse again
+                                 if (typeof parsedContent === 'string') {
+                                      try {
+                                          parsedContent = JSON.parse(parsedContent);
+                                      } catch (e) {
+                                          // ignore
+                                      }
+                                 }
+                                 
+                                 console.log(JSON.stringify(parsedContent, null, 2));
+                             } catch (e) {
+                                 // If not JSON, print as is
+                                 console.log(textContent);
+                             }
+                             console.log('------------------------------------');
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            // Not a valid JSON or tool call, ignore
+        }
+    }
+
+  } catch (error) {
+    console.error('Error:', error);
+  } finally {
+    await client.close();
+  }
 }
 
 main().catch(console.error);
