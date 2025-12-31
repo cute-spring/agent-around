@@ -5,7 +5,13 @@ const { generateText, tool } = require('ai');
 const { ollama } = require('ai-sdk-ollama');
 require('dotenv').config();
 
-// Simple JSON Schema to Zod converter for basic types
+/**
+ * Simple JSON Schema to Zod converter for basic types.
+ * Converts MCP tool input schemas to Zod schemas for AI SDK compatibility.
+ * 
+ * @param {Object} schema - The JSON schema to convert
+ * @returns {z.ZodType} - The corresponding Zod schema
+ */
 function jsonSchemaToZod(schema) {
   if (!schema) return z.any();
   
@@ -22,160 +28,159 @@ function jsonSchemaToZod(schema) {
     return z.object(shape).passthrough();
   }
   
-  if (schema.type === 'string') return z.string();
-  if (schema.type === 'number' || schema.type === 'integer') return z.number();
-  if (schema.type === 'boolean') return z.boolean();
-  if (schema.type === 'array') {
-    return z.array(jsonSchemaToZod(schema.items));
+  switch (schema.type) {
+    case 'string': return z.string();
+    case 'number':
+    case 'integer': return z.number();
+    case 'boolean': return z.boolean();
+    case 'array': return z.array(jsonSchemaToZod(schema.items));
+    default: return z.any();
   }
-  
-  return z.any();
 }
 
-async function main() {
-  const apiKey = process.env.ZHIPU_API_KEY;
-  if (!apiKey) {
-    console.error('ZHIPU_API_KEY is not set in .env');
-    process.exit(1);
-  }
-
-  // MCP Server Configuration
-  const mcpConfig = {
-    url: 'https://open.bigmodel.cn/api/mcp/web_search_prime/mcp',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-    }
-  };
-
-  console.log('Connecting to MCP server...');
-  const transport = new StreamableHTTPClientTransport(
-    mcpConfig.url, 
-    {
-      requestInit: {
-        headers: mcpConfig.headers
-      }
-    }
-  );
+/**
+ * Initializes and connects an MCP client.
+ * 
+ * @param {Object} config - Configuration for the MCP client
+ * @param {string} config.url - The MCP server URL
+ * @param {Object} config.headers - Headers for the connection
+ * @returns {Promise<Client>} - The connected MCP client
+ */
+async function setupMcpClient({ url, headers }) {
+  console.log(`Connecting to MCP server at ${url}...`);
+  
+  const transport = new StreamableHTTPClientTransport(url, {
+    requestInit: { headers }
+  });
   
   const client = new Client({
     name: "agent-around-client",
     version: "1.0.0",
   }, {
-    capabilities: {
-      tools: {},
-    },
+    capabilities: { tools: {} },
   });
 
+  await client.connect(transport);
+  console.log('Successfully connected to MCP server');
+  return client;
+}
+
+/**
+ * Converts a list of MCP tools into AI SDK compatible tools.
+ * 
+ * @param {Client} client - The connected MCP client
+ * @param {Array} mcpTools - List of tools from MCP server
+ * @returns {Object} - Object containing AI SDK tool definitions
+ */
+function convertToAiSdkTools(client, mcpTools) {
+  const tools = {};
+  
+  for (const mcpTool of mcpTools) {
+    tools[mcpTool.name] = tool({
+      description: mcpTool.description,
+      parameters: jsonSchemaToZod(mcpTool.inputSchema),
+      execute: async (args) => {
+        console.log(`[Tool] Executing ${mcpTool.name} with args:`, JSON.stringify(args));
+        const result = await client.callTool({
+          name: mcpTool.name,
+          arguments: args
+        });
+        
+        if (result.content && result.content.length > 0) {
+          const textContent = result.content.map(c => c.text).join('\n');
+          console.log(`[Tool] Result (truncated):`, textContent.substring(0, 100) + '...');
+          return textContent;
+        }
+        return "No content returned from tool.";
+      },
+    });
+  }
+  
+  return tools;
+}
+
+/**
+ * Handles fallback for cases where the model might generate a manual tool call string
+ * instead of using the tool execution mechanism directly.
+ */
+async function handleFallbackToolCall(client, resultText, tools) {
+  const jsonMatch = resultText.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return;
+
   try {
-    await client.connect(transport);
-    console.log('Connected to MCP server');
+    const potentialToolCall = JSON.parse(jsonMatch[0]);
+    const { name: toolName, arguments: toolArgs } = potentialToolCall;
 
-    // List tools
-    const mcpToolsList = await client.listTools();
-    const toolNames = mcpToolsList.tools.map(t => t.name).join(', ');
-    console.log(`Found ${mcpToolsList.tools.length} tools: ${toolNames}`);
-
-    // Optional: Manual Tool Verification (to prove MCP connection works)
-    // console.log('\n--- Verifying Tool Execution Manually ---');
-    // ... code ...
-
-    // Convert MCP tools to AI SDK tools
-    const tools = {};
-    for (const mcpTool of mcpToolsList.tools) {
-      tools[mcpTool.name] = tool({
-        description: mcpTool.description,
-        parameters: jsonSchemaToZod(mcpTool.inputSchema),
-        execute: async (args) => {
-          console.log(`[Tool] Executing ${mcpTool.name} with args:`, JSON.stringify(args));
-          const result = await client.callTool({
-              name: mcpTool.name,
-              arguments: args
-          });
-          
-          // Return the content from the tool result
-          if (result.content && result.content.length > 0) {
-              const textContent = result.content.map(c => c.text).join('\n');
-              console.log(`[Tool] Result (truncated):`, textContent.substring(0, 100) + '...');
-              return textContent;
-          }
-          return "No content returned from tool.";
-        },
+    if (toolName && toolArgs && tools[toolName]) {
+      console.log(`[Fallback] Executing ${toolName} manually...`);
+      const manualResult = await client.callTool({
+        name: toolName,
+        arguments: toolArgs
       });
+      
+      if (manualResult.content && manualResult.content.length > 0) {
+        const textContent = manualResult.content.map(c => c.text).join('\n');
+        console.log('\n--- Manual Tool Execution Result ---');
+        
+        // Attempt to parse and format if it's JSON
+        try {
+          let parsed = JSON.parse(textContent);
+          if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+          console.log(JSON.stringify(parsed, null, 2));
+        } catch {
+          console.log(textContent);
+        }
+        console.log('------------------------------------');
+      }
     }
+  } catch (e) {
+    // Not a valid JSON or tool call, ignore
+  }
+}
 
-    // Use with AI SDK
+async function main() {
+  const apiKey = process.env.ZHIPU_API_KEY;
+  if (!apiKey) {
+    console.error('Error: ZHIPU_API_KEY is not set in .env');
+    process.exit(1);
+  }
+
+  const mcpConfig = {
+    url: 'https://open.bigmodel.cn/api/mcp/web_search_prime/mcp',
+    headers: { Authorization: `Bearer ${apiKey}` }
+  };
+
+  let client;
+  try {
+    client = await setupMcpClient(mcpConfig);
+
+    const mcpToolsList = await client.listTools();
+    console.log(`Found ${mcpToolsList.tools.length} tools: ${mcpToolsList.tools.map(t => t.name).join(', ')}`);
+
+    const tools = convertToAiSdkTools(client, mcpToolsList.tools);
+
     console.log('\n--- Generating Text with MCP Tools ---');
     const result = await generateText({
       model: ollama('qwen2.5-coder:latest'), 
-      tools: tools,
+      tools,
       maxSteps: 5,
-      // Explicitly instructing the model to use the tool correctly can help with smaller models
       prompt: 'Use the "webSearchPrime" tool to search for "DeepSeek latest news". Make sure to use the correct parameter "search_query".',
     });
 
     console.log('\nFinal Answer:\n', result.text);
 
-    // Fallback: If the tool wasn't executed automatically but the text contains a tool call JSON
     if (result.toolCalls.length === 0) {
-        console.log('\n[Fallback] Checking if model generated tool call JSON...');
-        try {
-            // Attempt to find JSON block in the text
-            const jsonMatch = result.text.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                const potentialToolCall = JSON.parse(jsonMatch[0]);
-                if (potentialToolCall.name && potentialToolCall.arguments) {
-                    console.log(`[Fallback] Detected manual tool call for ${potentialToolCall.name}`);
-                    const toolName = potentialToolCall.name;
-                    const toolArgs = potentialToolCall.arguments;
-                    
-                    if (tools[toolName]) {
-                        console.log(`[Fallback] Executing ${toolName} manually...`);
-                        const manualResult = await client.callTool({
-                            name: toolName,
-                            arguments: toolArgs
-                        });
-                        
-                        if (manualResult.content && manualResult.content.length > 0) {
-                             const textContent = manualResult.content.map(c => c.text).join('\n');
-                             console.log('\n--- Manual Tool Execution Result ---');
-                             try {
-                                 // The content might be a JSON string wrapped in quotes, or double-stringified
-                                 let parsedContent = textContent;
-                                 if (typeof textContent === 'string') {
-                                     try {
-                                         parsedContent = JSON.parse(textContent);
-                                     } catch (e) {
-                                         // ignore
-                                     }
-                                 }
-                                 // If it was double stringified (e.g. "[...]" inside a string), parse again
-                                 if (typeof parsedContent === 'string') {
-                                      try {
-                                          parsedContent = JSON.parse(parsedContent);
-                                      } catch (e) {
-                                          // ignore
-                                      }
-                                 }
-                                 
-                                 console.log(JSON.stringify(parsedContent, null, 2));
-                             } catch (e) {
-                                 // If not JSON, print as is
-                                 console.log(textContent);
-                             }
-                             console.log('------------------------------------');
-                        }
-                    }
-                }
-            }
-        } catch (e) {
-            // Not a valid JSON or tool call, ignore
-        }
+      console.log('\n[Fallback] Checking for manual tool call generation...');
+      await handleFallbackToolCall(client, result.text, tools);
     }
 
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Application Error:', error);
   } finally {
-    await client.close();
+    if (client) {
+      await client.close();
+      console.log('MCP connection closed.');
+    }
   }
 }
 
