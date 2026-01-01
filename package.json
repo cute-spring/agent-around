@@ -12,10 +12,12 @@
   "type": "commonjs",
   "dependencies": {
     "@ai-sdk/openai": "^3.0.2",
+    "@mem0/vercel-ai-provider": "^2.0.5",
     "@modelcontextprotocol/sdk": "^1.25.1",
     "ai": "^6.0.5",
     "ai-sdk-ollama": "^3.0.1",
     "dotenv": "^17.2.3",
+    "mem0ai": "^2.2.0",
     "zod": "^3.23.8"
   }
 }
