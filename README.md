@@ -37,6 +37,8 @@
 - [17-human-in-the-loop.js](file:///Users/gavinzhang/ws-ai-recharge-2026/agent-around/examples/02-advanced/17-human-in-the-loop.js): **人工介入 (HITL)**，在执行敏感工具前请求人工确认。
 - [18-memory-persistence.js](file:///Users/gavinzhang/ws-ai-recharge-2026/agent-around/examples/02-advanced/18-memory-persistence.js): **记忆持久化**，将对话上下文保存至本地文件以实现跨会话记忆。
 - [19-semantic-routing.js](file:///Users/gavinzhang/ws-ai-recharge-2026/agent-around/examples/02-advanced/19-semantic-routing.js): **语义路由**，利用向量相似度将用户请求精准分发至不同的处理逻辑。
+- [20-supervisor-orchestration.js](file:///Users/gavinzhang/ws-ai-recharge-2026/agent-around/examples/02-advanced/20-supervisor-orchestration.js): **中控调度**，动态分配任务给专门的 Worker Agent。
+- [21-self-reflection-coding.js](file:///Users/gavinzhang/ws-ai-recharge-2026/agent-around/examples/02-advanced/21-self-reflection-coding.js): **自我反思**，通过多轮迭代提高生成质量。
 
 ### 03. 多模态 (Multimodal)
 - [7-vision-multimodal.js](file:///Users/gavinzhang/ws-ai-recharge-2026/agent-around/examples/03-multimodal/7-vision-multimodal.js): 视觉图片分析。
