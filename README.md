@@ -42,6 +42,7 @@
 - [22-mem0-integration.js](./examples/02-advanced/22-mem0-integration.js): **Mem0 长期记忆**，集成 Mem0 实现用户偏好的自动提取与持久化。
 - [23-mem0-graph-memory.js](./examples/02-advanced/23-mem0-graph-memory.js): **知识图谱记忆**，利用 Mem0 Graph 实现实体间复杂关系的存储与检索。
 - [24-data-stream-protocol.js](./examples/02-advanced/24-data-stream-protocol.js): **增强型流式协议**，演示如何在单 HTTP 流中通过“带标签的数据帧”同步发送文本与元数据。**推荐深度阅读：[Data Stream Protocol 核心价值分析](./examples/02-advanced/DATA_STREAM_DESIGN.md)**。
+- [26-performance-cost-optimization.js](./examples/02-advanced/26-performance-cost-optimization.js): **性能与成本优化**，涵盖 Prompt Caching 适配与精细化 Token 预算控制。**专题文档：[Prompt Caching 设计与应用](./examples/02-advanced/PROMPT_CACHING_DESIGN.md)**。
 
 #### 🛡️ 路由专项：企业级分发模式 (Enterprise Routing)
 > 这是一个完整的路由模式演进体系，展示了从规则匹配到混合语义路由的演进过程。详见 [策略分析文档](./examples/02-advanced/enterprise-routing/STRATEGIES_ANALYSIS.md)。
