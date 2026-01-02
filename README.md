@@ -39,6 +39,9 @@
 - [19-semantic-routing.js](./examples/02-advanced/19-semantic-routing.js): **语义路由**，利用向量相似度将用户请求精准分发至不同的处理逻辑。
 - [20-supervisor-orchestration.js](./examples/02-advanced/20-supervisor-orchestration.js): **中控调度**，动态分配任务给专门的 Worker Agent。
 - [21-self-reflection-coding.js](./examples/02-advanced/21-self-reflection-coding.js): **自我反思**，通过多轮迭代提高生成质量。
+- [22-mem0-integration.js](./examples/02-advanced/22-mem0-integration.js): **Mem0 长期记忆**，集成 Mem0 实现用户偏好的自动提取与持久化。
+- [23-mem0-graph-memory.js](./examples/02-advanced/23-mem0-graph-memory.js): **知识图谱记忆**，利用 Mem0 Graph 实现实体间复杂关系的存储与检索。
+- [24-data-stream-protocol.js](./examples/02-advanced/24-data-stream-protocol.js): **增强型流式协议**，演示如何在单 HTTP 流中通过“带标签的数据帧”同步发送文本与元数据。**推荐深度阅读：[Data Stream Protocol 核心价值分析](./examples/02-advanced/DATA_STREAM_DESIGN.md)**。
 
 #### 🛡️ 路由专项：企业级分发模式 (Enterprise Routing)
 > 这是一个完整的路由模式演进体系，展示了从规则匹配到混合语义路由的演进过程。详见 [策略分析文档](./examples/02-advanced/enterprise-routing/STRATEGIES_ANALYSIS.md)。
