@@ -1,23 +1,14 @@
 {
-  "name": "agent-around",
+  "name": "agent-around-monorepo",
+  "private": true,
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Monorepo for AI Agent Labs (Vercel AI SDK & PydanticAI)",
+  "workspaces": [
+    "js-ai-lab",
+    "py-pydantic-lab"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "dependencies": {
-    "@ai-sdk/openai": "^3.0.2",
-    "@mem0/vercel-ai-provider": "^2.0.5",
-    "@modelcontextprotocol/sdk": "^1.25.1",
-    "ai": "^6.0.5",
-    "ai-sdk-ollama": "^3.0.1",
-    "dotenv": "^17.2.3",
-    "mem0ai": "^2.2.0",
-    "zod": "^3.25.76"
+    "js:dev": "npm run dev --workspace=js-ai-lab",
+    "py:install": "pip install -r py-pydantic-lab/requirements.txt"
   }
 }
