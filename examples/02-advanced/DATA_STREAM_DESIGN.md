@@ -40,7 +40,41 @@
 
 ## 3. 系统设计 (Design)
 
-### 3.1 协议架构图
+### 3.1 增强型流式协议架构设计
+```mermaid
+graph TD
+    subgraph Server ["服务端 (Node.js/Next.js)"]
+        A["streamText() 核心逻辑"]
+        B["StreamData 容器"]
+        C["Data Stream Protocol 编码器"]
+        
+        A -->|"0: 文本块"| C
+        B -->|"d: 自定义元数据"| C
+        A -.->|"e: 结束控制帧"| C
+    end
+
+    subgraph Transport ["传输层 (HTTP Stream)"]
+        D["单 HTTP 连接<br/>(Content-Type: text/plain; charset=utf-8)"]
+    end
+
+    subgraph Client ["客户端 (Frontend)"]
+        E["useChat / useObject Hooks"]
+        F["UI 渲染层"]
+        G["状态管理 (Metadata Store)"]
+        
+        E -->|"解析 0:"| F
+        E -->|"解析 d:"| G
+    end
+
+    C --> D
+    D --> E
+    G -.->|"响应式更新"| F
+
+    style B fill:#f9f,stroke:#333,stroke-width:2px
+    style C fill:#0075ff,stroke:#fff,color:#fff
+```
+
+### 3.2 协议架构图 (逻辑视图)
 ```mermaid
 graph TD
     subgraph App_Server ["(1) 执行环境"]
