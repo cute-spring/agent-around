@@ -36,11 +36,16 @@
         - **流过程中**：推送当前工具调用的中间结果。
         - **流结束后**：推送建议问题（Follow-up Questions）或成本统计（Token Usage）。
 
-### 2.2 场景对比 (Scenario Comparison)
+### 2.2 场景对比
 
-## 3. 系统设计 (Design)
+## 3. 基础设施保障 (Infrastructure Continuity)
+为了确保流式响应的连续性，除了协议层的设计，还需要在基础设施层引入可靠性编排。
 
-### 3.1 增强型流式协议架构设计
+关于如何利用 SDK 的 `experimental_fallback` 和 `experimental_loadBalance` 实现高可用路由，请参阅 [路由策略深度分析：原生 SDK 可靠性编排](./enterprise-routing/STRATEGIES_ANALYSIS.md#8-native-sdk-reliability-orchestration--原生-sdk-可靠性编排)。
+
+## 4. 系统设计 (Design)
+
+### 4.1 增强型流式协议架构设计
 ```mermaid
 graph TD
     subgraph Server ["服务端 (Node.js/Next.js)"]
@@ -74,7 +79,7 @@ graph TD
     style C fill:#0075ff,stroke:#fff,color:#fff
 ```
 
-### 3.2 协议架构图 (逻辑视图)
+### 4.2 协议架构图 (逻辑视图)
 ```mermaid
 graph TD
     subgraph App_Server ["(1) 执行环境"]
@@ -108,7 +113,7 @@ graph TD
     J -.->|"更新状态"| I
 ```
 
-### 3.2 交互时序图
+### 4.3 交互时序图
 ```mermaid
 sequenceDiagram
     participant User as 用户 (Browser)
@@ -133,7 +138,7 @@ sequenceDiagram
     Server->>User: 关闭 HTTP 流
 ```
 
-## 4. 结论 (Conclusion)
+## 5. 结论 (Conclusion)
 Data Stream Protocol 不仅仅是一个传输协议，它是 AI 应用从“黑盒生成”向“透明交互”进化的基础设施。通过统一的帧格式，它极大地降低了前端处理复杂 AI 交互状态的难度。
 
 ### 🚀 最佳实践建议

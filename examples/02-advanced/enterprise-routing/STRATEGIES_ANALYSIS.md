@@ -197,6 +197,34 @@ graph TD
 
 ---
 
+### 8. Native SDK Reliability Orchestration | 原生 SDK 可靠性编排
+**File:** [25-sdk-orchestration-reliability.js](../25-sdk-orchestration-reliability.js)
+
+```mermaid
+graph TD
+    subgraph Reliability_Layer ["可靠性保障层"]
+        LB["负载均衡 (Load Balance)"]
+        FB["自动容灾 (Fallback)"]
+    end
+
+    Input["请求输入"] --> LB
+    LB -->|分发| P1["Provider A (GPT-4)"]
+    LB -->|分发| P2["Provider B (Claude)"]
+    
+    P1 -->|失败/限流| FB
+    FB -->|切换| P3["Provider C (Local Llama)"]
+```
+
+*   **Reason:** Even the best routing logic fails if the underlying model provider is down or rate-limited. Business-level routing (Strategy 4) handles "what to say", while Infrastructure-level orchestration handles "how to stay online".
+*   **Target:** Use Vercel AI SDK native features to ensure 99.99% availability of the AI service.
+*   **Features:**
+    *   **experimental_fallback**: Automatically switches to a backup model (e.g., from Cloud to Local) when the primary fails.
+    *   **experimental_loadBalance**: Distributes requests across multiple instances to maximize throughput and bypass rate limits.
+*   **Pros:** Zero-code implementation for complex retry/failover logic; significant boost in system resilience.
+*   **Cons:** Requires managing multiple model providers/instances.
+
+---
+
 ## Comparison Matrix
 
 | Strategy | Latency | Accuracy | Cost | Complexity | Use Case |
