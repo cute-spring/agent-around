@@ -6,12 +6,18 @@
 
 import asyncio
 import time
+import sys
+from pathlib import Path
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from datetime import datetime
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
-from examples.common.models import get_model
+
+# 环境配置
+root = Path(__file__).resolve().parents[1]
+sys.path.append(str(root))
+from common.models import get_model
 
 
 # ==================== 监控领域模型 ====================
@@ -118,7 +124,7 @@ class MonitoringSystem:
 
 cost_optimization_agent = Agent(
     model=get_model(),
-    result_type=CostOptimizationAdvice,
+    output_type=CostOptimizationAdvice,
     system_prompt="""你是一个成本优化专家。分析API使用模式，提出具体的成本优化建议。
 考虑模型选择、提示工程、缓存策略等方面。给出具体的节省估算。"""
 )
@@ -216,7 +222,7 @@ async def main():
         print(f"\n📝 调用 {i}: {query}")
         try:
             result = await monitored_agent.run_with_monitoring(query)
-            print(f"✅ 成功: {result.data[:100]}...")
+            print(f"✅ 成功: {result.output[:100]}...")
         except Exception as e:
             print(f"❌ 失败: {e}")
         
@@ -248,9 +254,10 @@ async def main():
 - Token使用分布: {metrics.token_usage}
 """
     
-    advice = await cost_optimization_agent.run(
+    advice_result = await cost_optimization_agent.run(
         f"请分析以下使用数据并提出成本优化建议:\n{optimization_data}"
     )
+    advice = advice_result.output
     
     print(f"识别问题: {advice.identified_issue}")
     print(f"优化建议: {advice.recommendation}")

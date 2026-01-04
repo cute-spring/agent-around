@@ -5,10 +5,16 @@
 """
 
 import asyncio
+import sys
+from pathlib import Path
 from typing import List, Dict, Optional
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
-from examples.common.models import get_model
+
+# 环境配置
+root = Path(__file__).resolve().parents[1]
+sys.path.append(str(root))
+from common.models import get_model
 
 
 # ==================== 知识图谱领域模型 ====================
@@ -132,7 +138,7 @@ query_understanding_agent = Agent(
 # 2. 图谱检索Agent  
 knowledge_retrieval_agent = Agent(
     model=get_model(),
-    result_type=RetrievedContext,
+    output_type=RetrievedContext,
     system_prompt="""你是一个知识检索专家。基于查询分析结果，从知识图谱中检索相关信息。
 返回相关的实体、关系和文本证据。"""
 )
@@ -141,7 +147,7 @@ knowledge_retrieval_agent = Agent(
 # 3. 多跳推理Agent
 multi_hop_reasoning_agent = Agent(
     model=get_model(), 
-    result_type=MultiHopAnswer,
+    output_type=MultiHopAnswer,
     system_prompt="""你是一个多跳推理专家。基于检索到的知识，进行多步推理来回答问题。
 展示清晰的推理步骤和置信度评估。"""
 )
@@ -204,7 +210,7 @@ class AdvancedRAGSystem:
         
         # 阶段2: 知识检索  
         print("📚 阶段2 - 知识检索")
-        context = self.retrieve_from_knowledge_graph(query_analysis.data)
+        context = self.retrieve_from_knowledge_graph(query_analysis.output)
         
         print(f"✅ 检索到 {len(context.entities)} 个实体, {len(context.relations)} 个关系")
         
@@ -239,7 +245,8 @@ async def main():
     """
     
     try:
-        answer = await rag_system.answer_question(complex_question)
+        run_result = await rag_system.answer_question(complex_question)
+        answer = run_result.output
         
         print("\n" + "="*60)
         print("💡 多跳推理答案")
