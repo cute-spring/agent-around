@@ -20,11 +20,16 @@ from dotenv import load_dotenv
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.deepseek import DeepSeekProvider
 from pydantic_ai.providers.ollama import OllamaProvider
+from pydantic_ai.providers.azure import AzureProvider
+from pydantic_ai.models.google import GoogleModel
+from pydantic_ai.providers.google import GoogleProvider
 
 class LLMProvider(str, Enum):
     DEEPSEEK = "deepseek"
     OPENAI = "openai"
     OLLAMA = "ollama"
+    AZURE_AD = "azure_ad"
+    GEMINI_VERTEX = "gemini_vertex"
     CUSTOM = "custom"
 
 def get_model(provider_override: Optional[str] = None):
@@ -65,6 +70,51 @@ def get_model(provider_override: Optional[str] = None):
         return OpenAIChatModel(
             model_name,
             provider=OllamaProvider(base_url=base_url),
+        )
+
+    elif provider == LLMProvider.AZURE_AD:
+        # Azure AD Auth (Managed Identity or Client Secret)
+        from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+        from openai import AsyncAzureOpenAI
+        
+        endpoint = os.getenv('AZURE_OPENAI_ENDPOINT')
+        api_version = os.getenv('AZURE_OPENAI_API_VERSION', '2024-08-01-preview')
+        model_name = os.getenv('AZURE_OPENAI_MODEL_NAME', 'gpt-4o')
+        
+        if not endpoint:
+            raise ValueError("AZURE_OPENAI_ENDPOINT is required for AZURE_AD provider.")
+            
+        token_provider = get_bearer_token_provider(
+            DefaultAzureCredential(), 
+            "https://cognitiveservices.azure.com/.default"
+        )
+        
+        az_client = AsyncAzureOpenAI(
+            azure_endpoint=endpoint,
+            azure_ad_token_provider=token_provider,
+            api_version=api_version
+        )
+        
+        return OpenAIChatModel(
+            model_name,
+            provider=AzureProvider(openai_client=az_client)
+        )
+        
+    elif provider == LLMProvider.GEMINI_VERTEX:
+        project = os.getenv('GOOGLE_PROJECT_ID')
+        location = os.getenv('GOOGLE_LOCATION', 'us-central1')
+        model_name = os.getenv('GOOGLE_MODEL_NAME', 'gemini-1.5-pro')
+        
+        if not project:
+            raise ValueError("GOOGLE_PROJECT_ID is required for GEMINI_VERTEX provider.")
+            
+        return GoogleModel(
+            model_name,
+            provider=GoogleProvider(
+                vertexai=True,
+                project=project,
+                location=location
+            )
         )
         
     elif provider == LLMProvider.CUSTOM:
