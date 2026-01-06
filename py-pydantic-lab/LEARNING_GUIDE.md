@@ -128,6 +128,12 @@
 - **合适场景**：商业应用需要控制成本和保证系统可靠性的场景。
 - **架构思考**：**可观测性设计**。通过指标收集、成本计算、优化建议的完整闭环实现生产级管理。
 
+### [4-azure-ad-auth.py](examples/05-production/4-azure-ad-auth.py)
+- **目标**：实现企业级 Azure AD 身份验证。
+- **用途**：演示如何通过 Managed Identity 或 Client Secret 获取 OAuth2 Token 并注入 Agent。
+- **合适场景**：对安全性要求极高、禁止使用静态 API Key 的企业级生产环境。
+- **架构思考**：**零信任架构 (Zero Trust)**。将认证逻辑从业务逻辑中解耦，利用依赖注入实现凭据的自动轮换。
+
 ---
 
 ## � 第四阶段：综合实战 (Comprehensive)

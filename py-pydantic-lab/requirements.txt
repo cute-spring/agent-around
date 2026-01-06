@@ -3,3 +3,5 @@ logfire
 pydantic
 python-dotenv
 httpx
+azure-identity
+openai
