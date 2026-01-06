@@ -13,11 +13,13 @@ This module implements the 'Factory Pattern' to decouple Agent logic from LLM pr
 """
 
 import os
+import httpx
 from enum import Enum
 from pathlib import Path
 from typing import Optional
 from dotenv import load_dotenv
 from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.providers.openai import OpenAIProvider
 from pydantic_ai.providers.deepseek import DeepSeekProvider
 from pydantic_ai.providers.ollama import OllamaProvider
 from pydantic_ai.providers.azure import AzureProvider
@@ -31,6 +33,15 @@ class LLMProvider(str, Enum):
     AZURE_AD = "azure_ad"
     GEMINI_VERTEX = "gemini_vertex"
     CUSTOM = "custom"
+
+def _get_http_client() -> Optional[httpx.AsyncClient]:
+    """
+    Helper to create an AsyncClient with proxy settings if configured.
+    """
+    proxy_url = os.getenv('LLM_PROXY_URL')
+    if proxy_url:
+        return httpx.AsyncClient(proxy=proxy_url)
+    return None
 
 def get_model(provider_override: Optional[str] = None):
     """
@@ -54,7 +65,7 @@ def get_model(provider_override: Optional[str] = None):
             raise ValueError("DEEPSEEK_API_KEY is not set in environment.")
         return OpenAIChatModel(
             'deepseek-chat',
-            provider=DeepSeekProvider(api_key=api_key),
+            provider=DeepSeekProvider(api_key=api_key, http_client=_get_http_client()),
         )
         
     elif provider == LLMProvider.OPENAI:
@@ -62,14 +73,17 @@ def get_model(provider_override: Optional[str] = None):
         if not api_key:
             raise ValueError("OPENAI_API_KEY is not set in environment.")
         model_name = os.getenv('OPENAI_MODEL_NAME', 'gpt-4o')
-        return OpenAIChatModel(model_name, api_key=api_key)
+        return OpenAIChatModel(
+            model_name, 
+            provider=OpenAIProvider(api_key=api_key, http_client=_get_http_client())
+        )
         
     elif provider == LLMProvider.OLLAMA:
         base_url = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434/v1')
         model_name = os.getenv('OLLAMA_MODEL_NAME', 'llama3')
         return OpenAIChatModel(
             model_name,
-            provider=OllamaProvider(base_url=base_url),
+            provider=OllamaProvider(base_url=base_url, http_client=_get_http_client()),
         )
 
     elif provider == LLMProvider.AZURE_AD:
@@ -92,7 +106,8 @@ def get_model(provider_override: Optional[str] = None):
         az_client = AsyncAzureOpenAI(
             azure_endpoint=endpoint,
             azure_ad_token_provider=token_provider,
-            api_version=api_version
+            api_version=api_version,
+            http_client=_get_http_client()
         )
         
         return OpenAIChatModel(
@@ -113,7 +128,8 @@ def get_model(provider_override: Optional[str] = None):
             provider=GoogleProvider(
                 vertexai=True,
                 project=project,
-                location=location
+                location=location,
+                http_client=_get_http_client()
             )
         )
         
@@ -125,4 +141,11 @@ def get_model(provider_override: Optional[str] = None):
         if not all([base_url, api_key, model_name]):
             raise ValueError("For CUSTOM provider, LLM_BASE_URL, LLM_API_KEY, and LLM_MODEL_NAME must all be set.")
             
-        return OpenAIChatModel(model_name, base_url=base_url, api_key=api_key)
+        return OpenAIChatModel(
+            model_name, 
+            provider=OpenAIProvider(
+                base_url=base_url, 
+                api_key=api_key, 
+                http_client=_get_http_client()
+            )
+        )
