@@ -58,6 +58,8 @@ def _get_http_client() -> Optional[httpx.AsyncClient]:
         )
     return _shared_http_client
 
+# Factory pattern: Unified interface for multiple LLM providers.
+# This ensures that switching between providers is a one-line change.
 def get_model(provider_override: Optional[str] = None):
     """
     Returns a model instance based on environment variables.

@@ -4,7 +4,34 @@
 
 ## 1. 方案对比
 
-### 方案 A：全局环境变量 (os.environ['http_proxy'])
+### 1.1 流量隔离可视化 (Traffic Isolation Visualization)
+为了直观展示两种方案的区别，请看下图：
+
+#### 方案 A: 全局代理 (Global Env)
+```mermaid
+graph TD
+    subgraph Process ["(1) 执行进程 (Python Process)"]
+        A["(1.1) 应用程序代码"] --> B["(1.2) 全局环境变量<br/>(http_proxy)"]
+        B --> C["(1.3) 所有网络请求"]
+    end
+    C -->|"强制经过"| D["(2) 企业代理服务器"]
+    D --> E["(3) 外部 LLM API"]
+    D -.->|"Step 4: (异常) 无法连接"| F["(4) 内网数据库 / Redis"]
+```
+
+#### 方案 B: 局部单例代理 (Scoped Singleton)
+```mermaid
+graph TD
+    subgraph Process ["(1) 执行进程 (Python Process)"]
+        A["(1.1) 应用程序代码"] --> B["(1.2) LLM Provider<br/>(注入 Proxy Client)"]
+        A --> C["(1.3) 其他服务<br/>(DB / Cache)"]
+    end
+    B -->|"经过"| D["(2) 企业代理服务器"]
+    D --> E["(3) 外部 LLM API"]
+    C -->|"直连 (更安全/更快速)"| F["(4) 内网基础设施"]
+```
+
+### 1.2 方案详情
 
 这种方式通过修改进程的环境变量来影响底层的网络库。
 
@@ -84,6 +111,31 @@ return httpx.AsyncClient(
 *   **资源枯竭**：高并发下会导致大量 `TIME_WAIT` 状态的连接，最终耗尽端口。
 
 ### 3.2 我们的解决方案：单例模式 (Singleton)
+
+#### 连接复用时序图 (Connection Reuse Sequence)
+下图展示了单例模式如何通过复用连接池来减少握手开销：
+
+```mermaid
+sequenceDiagram
+    participant AgentA as "Agent A (Step 1)"
+    participant AgentB as "Agent B (Step 2)"
+    participant Pool as "单例连接池<br/>(Shared Client)"
+    participant Proxy as "企业代理"
+    participant LLM as "LLM API"
+
+    Note over AgentA, LLM: Step 1: 第一次请求：初始化 (Initial Request)
+    AgentA->>Pool: 获取连接
+    Pool->>Proxy: TCP/TLS 握手 (一次性)
+    Proxy->>LLM: 建立连接
+    LLM-->>AgentA: 返回响应
+
+    Note over AgentB, LLM: Step 2: 后续请求：连接复用 (Keep-Alive Reuse)
+    AgentB->>Pool: 获取连接
+    Pool->>Proxy: 复用已有连接 (无握手)
+    Proxy->>LLM: 快速转发
+    LLM-->>AgentB: 返回响应
+```
+
 我们在 `models.py` 中实现了全局单例的 HTTP 客户端。通过复用同一个 `AsyncClient` 实例，我们实现了：
 *   **Keep-Alive 复用**：多个 LLM 请求复用同一个长连接。
 *   **并发控制**：通过 `httpx.Limits` 限制最大连接数，防止压垮代理服务器。
@@ -110,3 +162,8 @@ _shared_http_client = httpx.AsyncClient(
 我们在 `common/models.py` 中通过 `_get_http_client()` 辅助函数实现了这一模式。它通过读取 `LLM_PROXY_URL` 环境变量，动态地为 Azure 和 Google Provider 生成适配的 HTTP 客户端。
 
 这种设计确保了系统既能在普通开发环境下“开箱即用”，也能在严苛的企业生产环境下通过简单配置达到“工业级稳健”。
+
+---
+
+## 🤖 协作说明 (Collaboration Note)
+> *本可视化文档基于架构师教授 `/prof` 的深度分析生成，并由 `vizdoc` 进行结构化与图表实现。*
