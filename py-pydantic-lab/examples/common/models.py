@@ -34,14 +34,29 @@ class LLMProvider(str, Enum):
     GEMINI_VERTEX = "gemini_vertex"
     CUSTOM = "custom"
 
+# Global singleton client for connection pooling
+_shared_http_client: Optional[httpx.AsyncClient] = None
+
 def _get_http_client() -> Optional[httpx.AsyncClient]:
     """
-    Helper to create an AsyncClient with proxy settings if configured.
+    Helper to create/retrieve a singleton AsyncClient with proxy settings.
+    Implements connection pooling for high performance.
     """
+    global _shared_http_client
     proxy_url = os.getenv('LLM_PROXY_URL')
-    if proxy_url:
-        return httpx.AsyncClient(proxy=proxy_url)
-    return None
+    
+    if not proxy_url:
+        return None
+        
+    if _shared_http_client is None:
+        # Optimization: Use singleton pattern to reuse connection pool
+        _shared_http_client = httpx.AsyncClient(
+            proxy=proxy_url,
+            # Production-grade settings:
+            limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
+            timeout=httpx.Timeout(60.0)
+        )
+    return _shared_http_client
 
 def get_model(provider_override: Optional[str] = None):
     """
