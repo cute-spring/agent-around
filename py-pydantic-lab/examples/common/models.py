@@ -32,6 +32,7 @@ class LLMProvider(str, Enum):
     OLLAMA = "ollama"
     AZURE_AD = "azure_ad"
     GEMINI_VERTEX = "gemini_vertex"
+    ZHIPU = "zhipu"
     CUSTOM = "custom"
 
 # Global singleton client for connection pooling
@@ -150,7 +151,20 @@ def get_model(provider_override: Optional[str] = None):
             )
         )
         
-    elif provider == LLMProvider.CUSTOM:
+    elif provider == LLMProvider.ZHIPU:
+        api_key = os.getenv('ZHIPU_API_KEY')
+        base_url = os.getenv('ZHIPU_BASE_URL', 'https://open.bigmodel.cn/api/paas/v4/')
+        model_name = os.getenv('ZHIPU_MODEL_NAME', 'glm-4v')
+        return OpenAIChatModel(
+            model_name,
+            provider=OpenAIProvider(
+                base_url=base_url,
+                api_key=api_key,
+                http_client=_get_http_client()
+            )
+        )
+
+    if provider == LLMProvider.CUSTOM:
         base_url = os.getenv('LLM_BASE_URL')
         api_key = os.getenv('LLM_API_KEY')
         model_name = os.getenv('LLM_MODEL_NAME')
