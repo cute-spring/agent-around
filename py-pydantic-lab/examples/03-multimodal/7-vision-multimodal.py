@@ -35,16 +35,16 @@ class ImageAnalysis(BaseModel):
 
 # 2. 初始化 Agent
 # 注意：vision 任务通常需要支持多模态的模型，如 gpt-4o, claude-3-5-sonnet 或 llama3.2-vision
-# 对于某些不支持 Tool Calling 的模型（如目前的 llama3.2-vision），建议使用非结构化输出。
+# Pydantic AI 的核心优势在于可以将视觉分析结果直接转换为结构化对象
 agent = Agent(
     get_model(),
-    # 如果模型支持 Tool Calling，可以使用 output_type=ImageAnalysis 实现结构化提取
-    # 但为了兼容性，我们先演示基础的多模态文本返回
-    system_prompt="你是一个专业的视觉分析专家。请详细分析用户提供的图片内容。"
+    # 使用 output_type 实现结构化提取 (注: 在某些版本中可能为 result_type)
+    output_type=ImageAnalysis,
+    system_prompt="你是一个专业的视觉分析专家。请详细分析用户提供的图片内容，并以结构化格式返回。"
 )
 
 def main():
-    print('--- 示例 7: Pydantic AI 多模态视觉演示 ---')
+    print('--- 示例 7: Pydantic AI 多模态视觉演示 (结构化提取) ---')
 
     # 3. 准备图片路径 (指向共享的 assets 目录)
     # 项目结构中图片位于 js-ai-lab/assets/image-1.png
@@ -74,15 +74,23 @@ def main():
             ]
         )
         
-        # 6. 处理结果
-        print("\n--- AI 视觉分析结果 ---")
-        print(result.output)
+        # 6. 处理结构化结果
+        print("\n--- AI 视觉分析结果 (结构化) ---")
+        analysis = result.output
+        print(f"总结: {analysis.summary}")
+        print("\n检测到的物体:")
+        for obj in analysis.objects:
+            print(f"- {obj.name} (置信度: {obj.confidence:.2f}): {obj.description}")
+        
+        print(f"\n主导颜色: {', '.join(analysis.dominant_colors)}")
+        print(f"内容安全: {'是' if analysis.is_safe else '否'}")
         
         # 架构师笔记：
         # 1. 多模态输入：BinaryContent 让图片处理非常直观，无需手动 Base64 编码。
-        # 2. 模型限制：某些模型（如 llama3.2-vision）可能不支持 Tool Calling，
-        #    这时 Pydantic AI 的结构化提取 (output_type) 会失效，应退回到纯文本模式。
-        # 3. 如果需要结构化提取且模型支持，只需添加 output_type=MyModel 即可。
+        # 2. 结构化提取：通过 output_type=ImageAnalysis，Pydantic AI 自动处理 Tool Calling 
+        #    并验证模型输出，确保其符合我们定义的 Schema。
+        # 3. 模型限制：某些模型（如 llama3.2-vision）可能不支持 Tool Calling，
+        #    在这种情况下，建议移除 output_type 并退回到纯文本模式。
         
         print(f"\nToken 使用情况: {result.usage()}")
 
