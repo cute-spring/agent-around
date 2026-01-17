@@ -5,3 +5,5 @@ python-dotenv
 httpx
 azure-identity
 openai
+mcp
+anyio
