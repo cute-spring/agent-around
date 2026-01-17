@@ -90,11 +90,10 @@
 - **合适场景**：出行助手、本地生活服务 Agent。
 - **架构思考**：**物理世界感知**。通过成熟的 LBS 服务，赋予 AI Agent 感知和处理现实空间信息的能力。
 
-### [7-mcp-weather-history.py](examples/02-intermediate/7-mcp-weather-history.py)
-- **目标**：实现时间维度的气象回溯。
-- **用途**：查询 1940 年至今的全球历史天气数据。
-- **合适场景**：历史事件复盘、个人回忆增强、环境背景分析。
-- **架构思考**：**时空多维数据融合**。展示了 Agent 如何跨越时间维度，为历史数据提供环境上下文。
+### [9-mcp-weather-openweathermap.py](examples/02-intermediate/9-mcp-weather-openweathermap.py)
+- **目标**：行业标准天气服务集成。
+- **用途**：接入 OpenWeatherMap 提供实时天气、预报及空气质量。
+- **架构思考**：**多源数据整合 (Multi-source Data Aggregation)**。展示了如何通过 MCP 统一不同数据源的接口。
 
 ---
 
