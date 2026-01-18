@@ -49,6 +49,8 @@ try {
   console.warn('Gemini registration skipped:', e.message);
 }
 
+import { execSync } from 'child_process';
+
 const app = express();
 const port = 3000;
 
@@ -104,6 +106,38 @@ app.delete('/api/sessions/:id', (req, res) => {
     res.json({ success: true });
   } else {
     res.status(404).json({ error: 'Session not found' });
+  }
+});
+
+// 搜索会话内容 (使用 grep 优化)
+app.get('/api/search', (req, res) => {
+  const { q } = req.query;
+  if (!q) return res.json([]);
+
+  try {
+    // 使用 grep 在 sessions 目录下进行全文搜索 (-i 不区分大小写, -l 仅列出匹配的文件名)
+    // 这种方式比在 Node.js 中读取并解析所有 JSON 文件要快得多
+    const command = `grep -il "${q.replace(/"/g, '\\"')}" ${SESSIONS_DIR}/*.json`;
+    let output = '';
+    try {
+      output = execSync(command).toString();
+    } catch (e) {
+      // 如果 grep 没找到匹配项，它会抛出错误（退出码 1），这里捕获并返回空数组
+      return res.json([]);
+    }
+
+    const matchedFiles = output.split('\n').filter(Boolean);
+    const results = matchedFiles.map(filePath => {
+      const fileName = path.basename(filePath);
+      const id = fileName.replace('.json', '');
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      const title = Array.isArray(data) ? id : (data.title || id);
+      return { id, title };
+    });
+
+    res.json(results);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 
