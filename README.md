@@ -69,7 +69,16 @@
 ### 06. 可观测性 (Observability)
 - [9-token-usage.js](./examples/06-observability/9-token-usage.js): Token 消耗统计。
 
-## 📂 运行示例
+## 📂 项目组成
+
+本项目包含两个主要的实验室，分别针对不同的生态系统：
+
+1. **[JS AI Lab (Vercel AI SDK)](./js-ai-lab/)**: 基于 Node.js 的 AI 应用开发模式。
+2. **[Python AI Lab (PydanticAI)](./py-pydantic-lab/)**: 基于 Python 的强类型 AI Agent 开发实验室。
+
+---
+
+## 📂 运行示例 (JS)
 
 进入对应目录并运行：
 ```bash
