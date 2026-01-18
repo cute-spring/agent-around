@@ -20,7 +20,6 @@ import asyncio
 from pathlib import Path
 from dotenv import load_dotenv
 from pydantic_ai import Agent
-from pydantic_ai.mcp import MCPServerStdio
 
 # 加载环境变量
 # 尝试从多个可能的路径加载 .env 文件
@@ -48,26 +47,31 @@ if str(examples_root) not in sys.path:
     sys.path.append(str(examples_root))
 
 from common.models import get_model
+from common.mcp_utils import create_mcp_server
+
+# 1. 定义 MCP 配置
+# mcp-server-weread 更多信息: https://github.com/freestylefly/mcp-server-weread
+MCP_CONFIGS = {
+    "weread": {
+        "command": "npx",
+        "args": ["-y", "mcp-server-weread"],
+        "env_keys": ["WEREAD_COOKIE", "CC_ID"]  # 需要其中之一
+    }
+}
 
 async def main():
-    print('--- 示例 5: 微信读书 MCP 集成 (私人图书馆助手) ---')
+    print('--- 示例 5: 微信读书 MCP 集成 (配置驱动版) ---')
     
-    # 1. 检查必要配置
-    # mcp-server-weread 需要 WEREAD_COOKIE 或 CookieCloud 配置
+    # 2. 检查必要配置
+    # mcp-server-weread 需要 WEREAD_COOKIE 或 CookieCloud (CC_ID) 配置
     if not os.getenv('WEREAD_COOKIE') and not os.getenv('CC_ID'):
-        print("\n[跳过运行] 提示：未检测到 WEREAD_COOKIE。")
-        print("请在 .env 中配置微信读书 Cookie 以实际运行此示例。")
-        print("您可以从浏览器登录 weread.qq.com 后在控制台获取 Cookie。")
+        print("\n[跳过运行] 提示：未检测到 WEREAD_COOKIE 或 CC_ID。")
+        print("请在 .env 中配置微信读书相关变量以实际运行此示例。")
+        print("您可以参考：https://github.com/freestylefly/mcp-server-weread 获取 Cookie。")
         return
 
-    # 2. 定义 MCP 服务器配置
-    # 使用 npx 运行 mcp-server-weread
-    # 更多信息: https://github.com/freestylefly/mcp-server-weread
-    server = MCPServerStdio(
-        'npx',
-        args=['-y', 'mcp-server-weread'],
-        env=os.environ.copy()
-    )
+    # 3. 通过配置创建服务器
+    server = create_mcp_server(MCP_CONFIGS["weread"])
     
     # 3. 初始化 Agent
     agent = Agent(
