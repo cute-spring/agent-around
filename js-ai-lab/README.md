@@ -1,73 +1,39 @@
-# React + TypeScript + Vite
+# JS AI Lab
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+这是一个用于探索和学习 JavaScript AI 开发的实验项目。
 
-Currently, two official plugins are available:
+## 项目结构
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- `examples/`: 包含各种 AI 开发示例。
+    - `01-basics/`: 基础生成、流式输出、结构化输出。
+    - `02-advanced/`:
+        - `chatbot-web/`: **重点推荐** - 完整的 ChatGPT 风格 Web 应用。
+        - `enterprise-routing/`: 企业级模型路由策略。
+        - `multi-step-agent-extensions/`: 复杂 Agent 状态管理。
+- `lib/`: 通用的 AI Provider 封装，支持多模型注册。
+- `data/`: 存放本地会话和持久化数据。
 
-## React Compiler
+## 快速开始：Chatbot Web
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+项目中最完整的示例是 `chatbot-web`。
 
-## Expanding the ESLint configuration
+### 启动步骤
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+1. **安装依赖**:
+   ```bash
+   npm install
+   ```
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+2. **配置环境变量**:
+   在根目录下创建 `.env` 文件，并参考 `.env.example` 填写 API 密钥。
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+3. **运行服务**:
+   ```bash
+   cd examples/02-advanced/chatbot-web
+   node server.js
+   ```
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+4. **访问**:
+   [http://localhost:3000](http://localhost:3000)
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+更多详细信息请参阅 [chatbot-web README](examples/02-advanced/chatbot-web/README.md)。
