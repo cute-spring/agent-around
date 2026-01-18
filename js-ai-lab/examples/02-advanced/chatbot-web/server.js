@@ -1,0 +1,193 @@
+import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
+import dotenv from 'dotenv';
+import { convertToModelMessages, streamText, generateText } from 'ai';
+import { MODEL_REGISTRY, getModelInstance, registerModel } from '../../../lib/ai-providers.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const SESSIONS_DIR = path.join(__dirname, '../../../data/sessions');
+
+// 确保目录存在
+if (!fs.existsSync(SESSIONS_DIR)) {
+  fs.mkdirSync(SESSIONS_DIR, { recursive: true });
+}
+
+// 必须在加载 ai-providers 之前加载环境变量
+dotenv.config({ path: path.join(__dirname, '../../../.env') });
+
+// --- 示例：通过代码注册 Azure 模型 (支持 Token Provider) ---
+try {
+  registerModel({
+    id: 'azure-gpt-4',
+    name: 'Azure GPT-4 (Token Auth)',
+    provider: 'azure',
+    modelId: 'gpt-4',
+    resourceName: process.env.AZURE_RESOURCE_NAME,
+    tokenProvider: async () => {
+      console.log('Fetching Azure AD Token...');
+      return "dummy-token-for-demo"; 
+    }
+  });
+} catch (e) {
+  console.warn('Azure registration skipped:', e.message);
+}
+
+// --- 示例：通过代码注册 Google Gemini 模型 ---
+try {
+  registerModel({
+    id: 'gemini-1.5-flash',
+    name: 'Google Gemini 1.5 Flash',
+    provider: 'google',
+    modelId: 'gemini-1.5-flash',
+    apiKeyEnv: 'GOOGLE_GENERATIVE_AI_API_KEY',
+    group: 'cloud'
+  });
+} catch (e) {
+  console.warn('Gemini registration skipped:', e.message);
+}
+
+const app = express();
+const port = 3000;
+
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
+
+// 获取可用模型列表
+app.get('/api/models', (req, res) => {
+  res.json(MODEL_REGISTRY());
+});
+
+// 获取所有会话
+app.get('/api/sessions', (req, res) => {
+  try {
+    const files = fs.readdirSync(SESSIONS_DIR);
+    const sessions = files
+      .filter(f => f.endsWith('.json'))
+      .map(f => {
+        const id = f.replace('.json', '');
+        const filePath = path.join(SESSIONS_DIR, f);
+        const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        const title = Array.isArray(data) ? id : (data.title || id);
+        return { id, title };
+      });
+    res.json(sessions);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 获取特定会话内容
+app.get('/api/sessions/:id', (req, res) => {
+  const filePath = path.join(SESSIONS_DIR, `${req.params.id}.json`);
+  if (fs.existsSync(filePath)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      // 兼容旧格式（数组）和新格式（对象）
+      const messages = Array.isArray(data) ? data : (data.messages || []);
+      res.json(messages);
+    } catch (e) {
+      res.status(500).json({ error: 'Failed to parse session file' });
+    }
+  } else {
+    res.json([]);
+  }
+});
+
+// 删除会话
+app.delete('/api/sessions/:id', (req, res) => {
+  const filePath = path.join(SESSIONS_DIR, `${req.params.id}.json`);
+  if (fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+    res.json({ success: true });
+  } else {
+    res.status(404).json({ error: 'Session not found' });
+  }
+});
+
+app.post('/api/chat', async (req, res) => {
+  const { sessionId, userInput, modelId } = req.body;
+  
+  try {
+    const model = await getModelInstance(modelId || 'qwen-local');
+
+    // 加载历史
+    const filePath = path.join(SESSIONS_DIR, `${sessionId}.json`);
+    let sessionData = { messages: [], title: sessionId };
+    if (fs.existsSync(filePath)) {
+      const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      if (Array.isArray(data)) {
+        sessionData.messages = data;
+      } else {
+        sessionData = data;
+      }
+    }
+
+    // 添加用户消息
+    sessionData.messages.push({ role: 'user', content: userInput });
+
+    // 如果是新会话且没有标题，生成标题
+    if (sessionData.messages.length === 1 && (!sessionData.title || sessionData.title.startsWith('session-'))) {
+      try {
+        const { text: generatedTitle } = await generateText({
+          model: model,
+          system: '你是一个对话标题生成助手。请根据用户的第一句话，总结出一个简短、准确的标题（不超过10个字）。直接返回标题，不要包含任何标点符号、解释或引用。',
+          prompt: `用户说: "${userInput}"\n\n请生成标题:`,
+        });
+        sessionData.title = generatedTitle.trim().replace(/^["']|["']$/g, '');
+      } catch (e) {
+        console.error('Failed to generate title:', e);
+        sessionData.title = userInput.slice(0, 20);
+      }
+    }
+
+    const result = await streamText({
+      model: model,
+      messages: sessionData.messages,
+      onFinish: ({ text }) => {
+        // 保存 AI 回复
+        sessionData.messages.push({ role: 'assistant', content: text });
+        fs.writeFileSync(filePath, JSON.stringify(sessionData, null, 2));
+      }
+    });
+
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    
+    for await (const part of result.fullStream) {
+      if (part.type === 'text-delta') {
+        res.write(`0:${JSON.stringify(part.text)}\n`); // 匹配 index.html 的解析逻辑
+      }
+    }
+    res.end();
+
+  } catch (error) {
+    console.error('Chat error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/generate-title', async (req, res) => {
+  const { message, modelId } = req.body;
+  
+  try {
+    const model = await getModelInstance(modelId || 'qwen-local');
+
+    const { text } = await generateText({
+      model: model,
+      system: '你是一个对话标题生成助手。请根据用户的第一句话，总结出一个简短、准确的标题（不超过10个字）。直接返回标题，不要包含任何标点符号、解释或引用。',
+      prompt: `用户说: "${message}"\n\n请生成标题:`,
+    });
+
+    res.json({ title: text.trim().replace(/^["']|["']$/g, '') });
+
+  } catch (error) {
+    console.error('Title generation error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.listen(port, () => {
+  console.log(`Backend server running at http://localhost:${port}`);
+});

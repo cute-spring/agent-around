@@ -3,58 +3,129 @@
  * 核心价值：DRY (Don't Repeat Yourself)
  */
 
-require('dotenv').config();
-const { ollama } = require('ai-sdk-ollama');
-const { createOpenAI } = require('@ai-sdk/openai');
+import dotenv from 'dotenv';
+import { ollama } from 'ai-sdk-ollama';
+import { createOpenAI } from '@ai-sdk/openai';
 
-// 1. 本地 Ollama 配置
-const localProviders = {
-  chat: ollama('qwen2.5-coder:latest'),
-  vision: ollama('llama3.2-vision:11b'),
-  embedding: ollama.embeddingModel('nomic-embed-text:latest'),
-  // 辅助函数用于快速获取特定模型
-  model: (name) => ollama(name),
+dotenv.config();
+
+// --- 1. Provider 策略定义 (Strategy Pattern) ---
+const PROVIDER_STRATEGIES = {
+  'ollama': (config) => {
+    return ollama(config.modelId);
+  },
+  
+  'openai-compatible': (config) => {
+    const provider = createOpenAI({
+      apiKey: process.env[config.apiKeyEnv] || '',
+      baseURL: config.baseURL,
+      compatibility: 'compatible'
+    });
+    return provider.chat(config.modelId);
+  },
+  
+  'azure': (config) => {
+    // 动态导入，避免在未安装相关包时报错
+    return import('@ai-sdk/azure').then(({ createAzure }) => {
+      const azureOptions = {
+        resourceName: config.resourceName || process.env.AZURE_RESOURCE_NAME,
+        deploymentName: config.deploymentName || config.modelId,
+      };
+      if (config.tokenProvider) {
+        azureOptions.tokenProvider = config.tokenProvider;
+      } else {
+        azureOptions.apiKey = process.env[config.apiKeyEnv] || process.env.AZURE_API_KEY;
+      }
+      return createAzure(azureOptions)(config.modelId);
+    });
+  },
+  
+  'google': (config) => {
+    return import('@ai-sdk/google').then(({ createGoogleGenerativeAI }) => {
+      const google = createGoogleGenerativeAI({
+        apiKey: process.env[config.apiKeyEnv] || process.env.GOOGLE_GENERATIVE_AI_API_KEY,
+      });
+      return google(config.modelId);
+    });
+  }
 };
 
-// 2. 云端智谱 AI 配置 (OpenAI 兼容模式)
-const zhipuProvider = createOpenAI({
-  apiKey: process.env.ZHIPU_API_KEY,
-  baseURL: 'https://open.bigmodel.cn/api/paas/v4/',
-});
+// --- 2. 模型注册中心 (Model Registry) ---
+let MODELS = [
+  {
+    id: 'qwen-local',
+    name: 'Qwen 2.5 Coder (Local)',
+    provider: 'ollama',
+    modelId: 'qwen2.5-coder:latest',
+    group: 'local'
+  },
+  {
+    id: 'ollama-llama3',
+    name: 'Llama 3.2 Vision (Local)',
+    provider: 'ollama',
+    modelId: 'llama3.2-vision:latest',
+    group: 'local'
+  },
+  {
+    id: 'deepseek-chat',
+    name: 'DeepSeek Chat',
+    provider: 'openai-compatible',
+    modelId: 'deepseek-chat',
+    baseURL: 'https://api.deepseek.com',
+    apiKeyEnv: 'DEEPSEEK_API_KEY',
+    group: 'cloud'
+  }
+];
 
-// 3. DeepSeek 官方 Provider (使用 OpenAI 兼容模式以确保与 AI SDK v6 兼容)
-const deepseekProvider = createOpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY ?? '',
-  baseURL: 'https://api.deepseek.com',
-  compatibility: 'compatible',
-});
+// --- 3. 核心功能实现 ---
 
-// 4. Azure OpenAI 配置 (可选)
-// const { createAzure } = require('@ai-sdk/azure');
-// const azureProvider = createAzure({
-//   resourceName: process.env.AZURE_RESOURCE_NAME,
-//   apiKey: process.env.AZURE_API_KEY,
-// });
+const INSTANCE_CACHE = new Map();
 
-// 5. Google Gemini 配置 (可选)
-// const { createGoogleGenerativeAI } = require('@ai-sdk/google');
-// const googleProvider = createGoogleGenerativeAI({
-//   apiKey: process.env.GOOGLE_GENERATIVE_AI_API_KEY,
-// });
+function validateConfig(config) {
+  const required = ['id', 'name', 'provider', 'modelId'];
+  for (const field of required) {
+    if (!config[field]) throw new Error(`Missing required field: ${field}`);
+  }
+  if (!PROVIDER_STRATEGIES[config.provider]) {
+    throw new Error(`Unsupported provider: ${config.provider}`);
+  }
+}
 
-const cloudProviders = {
-  zhipu: zhipuProvider.chat('glm-4'),
-  zhipuFlash: zhipuProvider.chat('glm-4-flash'),
-  deepseek: deepseekProvider.chat('deepseek-chat'),
-  deepseekReasoning: deepseekProvider.chat('deepseek-reasoner'),
-  // azure: azureProvider('gpt-4o'), // 需要安装 @ai-sdk/azure
-  // gemini: googleProvider('gemini-1.5-flash'), // 需要安装 @ai-sdk/google
-  // 暴露原始 provider 以便自定义使用
-  zhipuFactory: zhipuProvider,
-  deepseekFactory: deepseekProvider,
-};
+export function registerModel(config) {
+  validateConfig(config);
+  const exists = MODELS.find(m => m.id === config.id);
+  if (exists) {
+    MODELS = MODELS.map(m => m.id === config.id ? { ...m, ...config } : m);
+  } else {
+    MODELS.push(config);
+  }
+  INSTANCE_CACHE.delete(config.id);
+}
 
-module.exports = {
-  local: localProviders,
-  cloud: cloudProviders,
-};
+export function registerProvider(type, strategyFn) {
+  PROVIDER_STRATEGIES[type] = strategyFn;
+}
+
+export function MODEL_REGISTRY() {
+  return MODELS;
+}
+
+export async function getModelInstance(modelId) {
+  if (INSTANCE_CACHE.has(modelId)) {
+    return INSTANCE_CACHE.get(modelId);
+  }
+
+  const config = MODELS.find(m => m.id === modelId);
+  if (!config) throw new Error(`Model ${modelId} not found in registry`);
+
+  const strategy = PROVIDER_STRATEGIES[config.provider];
+  if (!strategy) throw new Error(`Provider strategy ${config.provider} not found`);
+
+  try {
+    const instance = await strategy(config);
+    INSTANCE_CACHE.set(modelId, instance);
+    return instance;
+  } catch (e) {
+    throw new Error(`Failed to initialize ${modelId} (${config.provider}): ${e.message}`);
+  }
+}
