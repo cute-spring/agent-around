@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Chatbot - ChatGPT Style</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script src="lib/tailwind.min.js"></script>
+    <script src="lib/marked.min.js"></script>
+    <script src="lib/mermaid.min.js"></script>
     <style>
         .sidebar { width: 260px; background-color: #f9fafb; border-right: 1px solid #e5e7eb; transition: transform 0.3s ease; }
         @media (max-width: 768px) {
@@ -90,7 +90,7 @@
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
             </button>
             <div class="flex-1 flex justify-center text-sm font-medium text-gray-500 truncate">
-                <span id="currentSessionTitle">Default Session</span>
+                <span id="currentSessionTitle">New Chat</span>
             </div>
             <div class="w-10 md:hidden"></div> <!-- Spacer for centering title on mobile -->
         </header>
@@ -242,7 +242,7 @@
         const agentIdInput = document.getElementById('agentIdInput');
         const modalTitle = document.getElementById('modalTitle');
 
-        let currentSessionId = 'default-session';
+        let currentSessionId = `session-${Date.now()}`;
         let currentAgentId = null;
         let agentsData = [];
 
@@ -413,11 +413,6 @@
                 sessions = await res.json();
             }
             sessionList.innerHTML = '';
-            
-            // 确保 default-session 存在
-            if (!sessions.find(s => s.id === 'default-session')) {
-                sessions.unshift({ id: 'default-session', title: 'Default Session' });
-            }
 
             sessions.forEach(session => {
                 const { id, title } = session;
@@ -426,11 +421,9 @@
                 item.innerHTML = `
                     <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 flex-shrink-0" xmlns="http://www.w3.org/2000/svg"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
                     <span class="truncate flex-1">${title}</span>
-                    ${id !== 'default-session' ? `
                     <button class="delete-session-btn opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 transition-all" onclick="event.stopPropagation(); deleteSession('${id}')">
                         <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" xmlns="http://www.w3.org/2000/svg"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                     </button>
-                    ` : ''}
                 `;
                 item.onclick = () => loadSession(id, title);
                 sessionList.appendChild(item);
@@ -444,7 +437,7 @@
                 const res = await fetch(`/api/sessions/${id}`, { method: 'DELETE' });
                 if (res.ok) {
                     if (currentSessionId === id) {
-                        loadSession('default-session');
+                        newChatBtn.click();
                     }
                     loadSessionList();
                 } else {
@@ -457,7 +450,7 @@
 
         async function loadSession(id, title) {
             currentSessionId = id;
-            currentSessionTitle.innerText = title || id;
+            currentSessionTitle.innerText = title || (id.startsWith('session-') ? 'New Chat' : id);
             
             // 关闭移动端侧边栏
             sidebar.classList.remove('open');
@@ -501,7 +494,7 @@
 
         newChatBtn.onclick = () => {
             const newId = `session-${Date.now()}`;
-            loadSession(newId, '新对话');
+            loadSession(newId);
             loadSessionList(); // 刷新列表
         };
 
