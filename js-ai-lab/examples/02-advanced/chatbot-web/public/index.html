@@ -8,10 +8,20 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
     <style>
-        .sidebar { width: 260px; background-color: #f9fafb; border-right: 1px solid #e5e7eb; }
-        .chat-main { background-color: #ffffff; }
-        .message-user { background-color: #ffffff; color: #374151; }
-        .message-ai { background-color: #f7f7f8; color: #374151; }
+        .sidebar { width: 260px; background-color: #f9fafb; border-right: 1px solid #e5e7eb; transition: transform 0.3s ease; }
+        @media (max-width: 768px) {
+            .sidebar { position: fixed; height: 100%; z-index: 40; transform: translateX(-100%); }
+            .sidebar.open { transform: translateX(0); }
+            .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 30; }
+            .sidebar-overlay.show { display: block; }
+        }
+        .chat-main { background-color: #f9fafb; }
+        .message-bubble { border-radius: 1.25rem; transition: all 0.2s ease; }
+        .prose pre { background-color: #1e1e1e !important; border-radius: 0.75rem; }
+        .welcome-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); background-color: #ffffff; }
+        .welcome-card:hover { transform: translateY(-2px); border-color: #10b981; background-color: #f0fdf4; }
+        .message-user { background-color: transparent; }
+        .message-ai { background-color: transparent; }
         .prose { color: #374151; max-width: none; }
         .prose h1, .prose h2, .prose h3 { color: #111827; }
         .prose code { color: #ef4444; background: #f3f4f6; padding: 2px 4px; border-radius: 4px; }
@@ -34,9 +44,12 @@
         ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
     </style>
 </head>
-<body class="h-screen flex text-gray-800 font-sans">
+<body class="h-screen flex text-gray-800 font-sans overflow-hidden">
+    <!-- Sidebar Overlay for Mobile -->
+    <div id="sidebarOverlay" class="sidebar-overlay"></div>
+
     <!-- Sidebar -->
-    <aside class="sidebar flex flex-col p-2 transition-all">
+    <aside id="sidebar" class="sidebar flex flex-shrink-0 flex-col p-2">
         <div class="px-3 py-4 flex items-center gap-2 mb-2">
             <div class="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
                 <svg stroke="white" fill="none" stroke-width="2" viewBox="0 0 24 24" class="h-5 w-5" xmlns="http://www.w3.org/2000/svg"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
@@ -62,7 +75,7 @@
             <!-- Sessions will be loaded here -->
         </div>
 
-        <div class="mt-auto pt-4 border-t border-gray-200">
+        <div class="mt-auto pt-4 border-t border-gray-200 hidden">
             <label class="text-[10px] text-gray-400 uppercase mb-1 block">Select Model</label>
             <select id="modelSelect" class="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 text-gray-700">
                 <!-- Models will be loaded here -->
@@ -71,22 +84,57 @@
     </aside>
 
     <!-- Main Chat Area -->
-    <main class="chat-main flex-1 flex flex-col relative">
-        <header class="h-14 border-b border-gray-200 flex items-center justify-center text-sm font-medium text-gray-500">
-            <span id="currentSessionTitle">Default Session</span>
+    <main class="chat-main flex-1 flex flex-col relative min-w-0">
+        <header class="h-14 border-b border-gray-200 flex items-center px-4 shrink-0">
+            <button id="sidebarToggle" class="p-2 -ml-2 mr-2 text-gray-500 hover:text-gray-700 md:hidden">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+            <div class="flex-1 flex justify-center text-sm font-medium text-gray-500 truncate">
+                <span id="currentSessionTitle">Default Session</span>
+            </div>
+            <div class="w-10 md:hidden"></div> <!-- Spacer for centering title on mobile -->
         </header>
 
         <div id="chatBox" class="flex-1 overflow-y-auto pb-32">
-            <!-- Messages -->
-            <div class="flex flex-col items-center justify-center h-full opacity-40" id="welcomeScreen">
-                <h2 class="text-4xl font-bold text-gray-200">ChatGPT Lite</h2>
+            <!-- Welcome Screen -->
+            <div class="max-w-4xl mx-auto px-6 py-20" id="welcomeScreen">
+                <div class="text-center mb-12">
+                    <div class="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-emerald-200">
+                        <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    </div>
+                    <h2 class="text-3xl font-bold text-gray-900 mb-3">How can I help you today?</h2>
+                    <p class="text-gray-500">Select an agent or just start typing to begin a new conversation.</p>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button onclick="quickPrompt('Write a professional email for a job application')" class="welcome-card p-5 border border-gray-100 rounded-2xl text-left hover:shadow-md">
+                        <div class="text-emerald-600 mb-2"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg></div>
+                        <div class="font-bold text-sm text-gray-800 mb-1">Professional Email</div>
+                        <div class="text-xs text-gray-400">Draft a polished job application email</div>
+                    </button>
+                    <button onclick="quickPrompt('Explain quantum computing in simple terms for a 10-year old')" class="welcome-card p-5 border border-gray-100 rounded-2xl text-left hover:shadow-md">
+                        <div class="text-blue-600 mb-2"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.364-7.364l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg></div>
+                        <div class="font-bold text-sm text-gray-800 mb-1">Explain Concepts</div>
+                        <div class="text-xs text-gray-400">Break down complex topics simply</div>
+                    </button>
+                    <button onclick="quickPrompt('Write a clean Python script to scrape a website')" class="welcome-card p-5 border border-gray-100 rounded-2xl text-left hover:shadow-md">
+                        <div class="text-indigo-600 mb-2"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg></div>
+                        <div class="font-bold text-sm text-gray-800 mb-1">Code Assistant</div>
+                        <div class="text-xs text-gray-400">Generate or debug code snippets</div>
+                    </button>
+                    <button onclick="quickPrompt('Help me plan a 3-day trip to Tokyo on a budget')" class="welcome-card p-5 border border-gray-100 rounded-2xl text-left hover:shadow-md">
+                        <div class="text-orange-600 mb-2"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg></div>
+                        <div class="font-bold text-sm text-gray-800 mb-1">Travel Planning</div>
+                        <div class="text-xs text-gray-400">Create detailed travel itineraries</div>
+                    </button>
+                </div>
             </div>
         </div>
 
         <!-- Input Area -->
         <div class="absolute bottom-0 left-0 w-full bg-gradient-to-t from-white via-white to-transparent pt-6">
-            <div class="max-w-3xl mx-auto px-4 pb-8">
-                <!-- Agent Selector (Trae Style) -->
+            <div class="max-w-5xl mx-auto px-4 pb-8">
+                <!-- Agent & Model Selectors -->
                 <div class="flex items-center gap-2 mb-3 px-1">
                     <div class="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-full cursor-pointer transition-colors group relative" id="agentSelectorBtn">
                         <div class="w-2 h-2 rounded-full bg-emerald-500" id="currentAgentStatus"></div>
@@ -107,7 +155,16 @@
                         </div>
                     </div>
                     <div class="h-4 w-px bg-gray-200"></div>
-                    <div class="text-[10px] text-gray-400 font-medium uppercase tracking-widest">Active Agent</div>
+                    <div class="relative group">
+                        <select id="inputModelSelect" class="appearance-none bg-gray-100 hover:bg-gray-200 rounded-full px-3 py-1.5 text-xs font-bold text-gray-500 hover:text-gray-700 cursor-pointer transition-colors outline-none border-none pr-8">
+                            <option value="gpt-4o">GPT-4o</option>
+                            <option value="gpt-4o-mini">GPT-4o Mini</option>
+                            <option value="o1-mini">o1 Mini</option>
+                        </select>
+                        <div class="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400 group-hover:text-gray-600">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="input-container relative flex items-end w-full rounded-xl">
@@ -158,6 +215,7 @@
         const userInput = document.getElementById('userInput');
         const sendBtn = document.getElementById('sendBtn');
         const modelSelect = document.getElementById('modelSelect');
+        const inputModelSelect = document.getElementById('inputModelSelect');
         const sessionList = document.getElementById('sessionList');
         const newChatBtn = document.getElementById('newChatBtn');
         const currentSessionTitle = document.getElementById('currentSessionTitle');
@@ -170,6 +228,10 @@
         const agentListContainer = document.getElementById('agentListContainer');
         const selectedAgentName = document.getElementById('selectedAgentName');
         const currentAgentStatus = document.getElementById('currentAgentStatus');
+        
+        const sidebar = document.getElementById('sidebar');
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
         
         const addAgentBtn = document.getElementById('addAgentBtn');
         const agentModal = document.getElementById('agentModal');
@@ -266,6 +328,17 @@
         
         agentDropdown.onclick = (e) => e.stopPropagation();
 
+        // Sidebar Toggle for Mobile
+        sidebarToggle.onclick = () => {
+            sidebar.classList.add('open');
+            sidebarOverlay.classList.add('show');
+        };
+
+        sidebarOverlay.onclick = () => {
+            sidebar.classList.remove('open');
+            sidebarOverlay.classList.remove('show');
+        };
+
         function editAgent(id, name, prompt) {
             agentIdInput.value = id;
             agentNameInput.value = name;
@@ -313,19 +386,21 @@
             } catch (e) { console.error(e); }
         };
 
+        // 同步两个模型选择器
+        modelSelect.onchange = () => {
+            inputModelSelect.value = modelSelect.value;
+        };
+        inputModelSelect.onchange = () => {
+            modelSelect.value = inputModelSelect.value;
+        };
+
         async function loadModels() {
             try {
                 const res = await fetch('/api/models');
                 const models = await res.json();
-                modelSelect.innerHTML = '';
-                
-                // 按组分类显示（可选，这里先简单列出）
-                models.forEach(m => {
-                    const opt = document.createElement('option');
-                    opt.value = m.id;
-                    opt.innerText = m.name;
-                    modelSelect.appendChild(opt);
-                });
+                const options = models.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
+                modelSelect.innerHTML = options;
+                inputModelSelect.innerHTML = options;
             } catch (e) {
                 console.error('Failed to load models:', e);
             }
@@ -384,6 +459,10 @@
             currentSessionId = id;
             currentSessionTitle.innerText = title || id;
             
+            // 关闭移动端侧边栏
+            sidebar.classList.remove('open');
+            sidebarOverlay.classList.remove('show');
+            
             // 更新 UI 状态
             document.querySelectorAll('.session-item').forEach(el => {
                 const span = el.querySelector('span');
@@ -437,14 +516,14 @@
             wrapper.dataset.content = content;
             
             const container = document.createElement('div');
-            container.className = 'max-w-3xl w-full px-4 flex gap-6 relative';
+            container.className = 'max-w-5xl w-full px-4 flex gap-6 relative';
 
             const avatar = document.createElement('div');
-            avatar.className = `w-8 h-8 rounded-sm flex items-center justify-center flex-shrink-0 font-bold text-xs ${role === 'user' ? 'bg-indigo-600' : 'bg-emerald-600'}`;
+            avatar.className = `w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 font-bold text-xs ${role === 'user' ? 'bg-gray-200 text-gray-600' : 'bg-emerald-600 text-white'}`;
             avatar.innerText = role === 'user' ? 'U' : 'AI';
 
             const contentDiv = document.createElement('div');
-            contentDiv.className = 'flex-1 prose';
+            contentDiv.className = `message-bubble max-w-[85%] px-5 py-3 text-sm leading-relaxed ${role === 'user' ? 'ml-auto bg-emerald-600 text-white border border-emerald-700 shadow-sm' : 'prose prose-sm max-w-none bg-white border border-gray-200 shadow-sm text-gray-800'}`;
             
             // 复制按钮
             const copyBtn = document.createElement('button');
@@ -454,13 +533,16 @@
             `;
             copyBtn.onclick = () => copyToClipboard(content, copyBtn);
             
-            let htmlContent = marked.parse(content);
-            if (role === 'assistant') {
+            if (role === 'user') {
+                contentDiv.innerText = content;
+                container.classList.add('flex-row-reverse');
+            } else {
+                let htmlContent = marked.parse(content);
                 htmlContent = htmlContent.replace(/<pre><code class="language-mermaid">([\s\S]*?)<\/code><\/pre>/g, (match, code) => {
                     return `<div class="mermaid">${code.trim()}</div>`;
                 });
+                contentDiv.innerHTML = htmlContent;
             }
-            contentDiv.innerHTML = htmlContent;
 
             container.appendChild(avatar);
             container.appendChild(contentDiv);
@@ -489,6 +571,14 @@
             try {
                 await mermaid.run();
             } catch (e) { console.error(e); }
+        }
+
+        function quickPrompt(text) {
+            userInput.value = text;
+            userInput.style.height = 'auto';
+            userInput.style.height = userInput.scrollHeight + 'px';
+            userInput.focus();
+            sendBtn.disabled = false;
         }
 
         async function sendMessage() {
