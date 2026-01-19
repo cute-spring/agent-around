@@ -9,10 +9,14 @@ import { MODEL_REGISTRY, getModelInstance, registerModel } from '../../../lib/ai
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const SESSIONS_DIR = path.join(__dirname, '../../../data/sessions');
+const AGENTS_DIR = path.join(__dirname, '../../../data/agents');
 
 // 确保目录存在
 if (!fs.existsSync(SESSIONS_DIR)) {
   fs.mkdirSync(SESSIONS_DIR, { recursive: true });
+}
+if (!fs.existsSync(AGENTS_DIR)) {
+  fs.mkdirSync(AGENTS_DIR, { recursive: true });
 }
 
 // 必须在加载 ai-providers 之前加载环境变量
@@ -60,6 +64,55 @@ app.use(express.static(path.join(__dirname, 'public')));
 // 获取可用模型列表
 app.get('/api/models', (req, res) => {
   res.json(MODEL_REGISTRY());
+});
+
+// --- Agent 相关接口 ---
+
+// 获取所有 Agent
+app.get('/api/agents', (req, res) => {
+  try {
+    if (!fs.existsSync(AGENTS_DIR)) return res.json([]);
+    const files = fs.readdirSync(AGENTS_DIR);
+    const agents = files
+      .filter(f => f.endsWith('.json'))
+      .map(f => {
+        const filePath = path.join(AGENTS_DIR, f);
+        return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      });
+    res.json(agents);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 创建或更新 Agent
+app.post('/api/agents', (req, res) => {
+  const { id, name, prompt } = req.body;
+  if (!name || !prompt) {
+    return res.status(400).json({ error: 'Name and Prompt are required' });
+  }
+
+  const agentId = id || `agent-${Date.now()}`;
+  const agentData = { id: agentId, name, prompt };
+  const filePath = path.join(AGENTS_DIR, `${agentId}.json`);
+
+  try {
+    fs.writeFileSync(filePath, JSON.stringify(agentData, null, 2));
+    res.json(agentData);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// 删除 Agent
+app.delete('/api/agents/:id', (req, res) => {
+  const filePath = path.join(AGENTS_DIR, `${req.params.id}.json`);
+  if (fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+    res.json({ success: true });
+  } else {
+    res.status(404).json({ error: 'Agent not found' });
+  }
 });
 
 // 获取所有会话
@@ -142,10 +195,20 @@ app.get('/api/search', (req, res) => {
 });
 
 app.post('/api/chat', async (req, res) => {
-  const { sessionId, userInput, modelId } = req.body;
+  const { sessionId, userInput, modelId, agentId } = req.body;
   
   try {
     const model = await getModelInstance(modelId || 'qwen-local');
+
+    // 加载 Agent 配置
+    let systemPrompt = '';
+    if (agentId) {
+      const agentPath = path.join(AGENTS_DIR, `${agentId}.json`);
+      if (fs.existsSync(agentPath)) {
+        const agentData = JSON.parse(fs.readFileSync(agentPath, 'utf8'));
+        systemPrompt = agentData.prompt;
+      }
+    }
 
     // 加载历史
     const filePath = path.join(SESSIONS_DIR, `${sessionId}.json`);
@@ -179,6 +242,7 @@ app.post('/api/chat', async (req, res) => {
 
     const result = await streamText({
       model: model,
+      system: systemPrompt,
       messages: sessionData.messages,
       onFinish: ({ text }) => {
         // 保存 AI 回复

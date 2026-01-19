@@ -56,7 +56,8 @@
             </div>
             <input type="text" id="searchInput" placeholder="搜索历史对话..." class="w-full bg-gray-100 border-none rounded-md py-2 pl-10 pr-4 text-xs focus:ring-1 focus:ring-blue-500 text-gray-700 outline-none">
         </div>
-        
+
+        <label class="px-3 text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-2 block">History</label>
         <div id="sessionList" class="flex-1 overflow-y-auto flex flex-col gap-1">
             <!-- Sessions will be loaded here -->
         </div>
@@ -85,6 +86,30 @@
         <!-- Input Area -->
         <div class="absolute bottom-0 left-0 w-full bg-gradient-to-t from-white via-white to-transparent pt-6">
             <div class="max-w-3xl mx-auto px-4 pb-8">
+                <!-- Agent Selector (Trae Style) -->
+                <div class="flex items-center gap-2 mb-3 px-1">
+                    <div class="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-full cursor-pointer transition-colors group relative" id="agentSelectorBtn">
+                        <div class="w-2 h-2 rounded-full bg-emerald-500" id="currentAgentStatus"></div>
+                        <span class="text-xs font-bold text-gray-700" id="selectedAgentName">Standard AI</span>
+                        <svg class="w-3 h-3 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        
+                        <!-- Dropdown -->
+                        <div id="agentDropdown" class="hidden absolute bottom-full left-0 mb-2 w-64 bg-white border border-gray-200 rounded-xl shadow-xl py-2 z-50">
+                            <div id="agentListContainer" class="max-h-64 overflow-y-auto">
+                                <!-- Agents load here -->
+                            </div>
+                            <div class="border-t border-gray-100 mt-2 px-2 pt-2">
+                                <button id="addAgentBtn" class="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                                    Create New Agent
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="h-4 w-px bg-gray-200"></div>
+                    <div class="text-[10px] text-gray-400 font-medium uppercase tracking-widest">Active Agent</div>
+                </div>
+
                 <div class="input-container relative flex items-end w-full rounded-xl">
                     <textarea id="userInput" rows="1" class="w-full bg-transparent border-none focus:ring-0 resize-none py-4 pl-4 pr-12 max-h-[200px] overflow-y-auto" placeholder="Send a message..."></textarea>
                     <button id="sendBtn" class="absolute right-2 bottom-2 p-2 text-gray-400 hover:text-blue-600 transition-colors disabled:opacity-30" disabled>
@@ -96,6 +121,38 @@
         </div>
     </main>
 
+    <!-- Agent Modal -->
+    <div id="agentModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col shadow-xl">
+            <div class="p-6 border-b border-gray-100 flex items-center justify-between">
+                <h3 id="modalTitle" class="text-xl font-bold">Create New Agent</h3>
+                <button onclick="document.getElementById('agentModal').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto p-6">
+                <div class="flex flex-col gap-6">
+                    <input type="hidden" id="agentIdInput">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-2 tracking-wider">Agent Name</label>
+                        <input type="text" id="agentNameInput" class="w-full border border-gray-300 rounded-md px-4 py-3 text-base focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all" placeholder="e.g., Senior Python Architect">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-2 tracking-wider">System Prompt</label>
+                        <textarea id="agentPromptInput" rows="16" class="w-full border border-gray-300 rounded-md px-4 py-3 text-base font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none transition-all" placeholder="Enter the detailed agent's behavior, personality, and specific instructions..."></textarea>
+                        <p class="mt-2 text-xs text-gray-400">The system prompt defines how the AI behaves. Use clear, detailed instructions for better results.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-6 border-t border-gray-100 flex justify-end gap-3 bg-gray-50 rounded-b-lg">
+                <button id="cancelAgentBtn" class="px-6 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-200 rounded-md transition-colors">Cancel</button>
+                <button id="saveAgentBtn" class="px-8 py-2.5 text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-700 rounded-md shadow-sm transition-all">Save Agent</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const chatBox = document.getElementById('chatBox');
         const userInput = document.getElementById('userInput');
@@ -106,17 +163,155 @@
         const currentSessionTitle = document.getElementById('currentSessionTitle');
         const welcomeScreen = document.getElementById('welcomeScreen');
         const searchInput = document.getElementById('searchInput');
+        
+        // Agent UI Elements
+        const agentSelectorBtn = document.getElementById('agentSelectorBtn');
+        const agentDropdown = document.getElementById('agentDropdown');
+        const agentListContainer = document.getElementById('agentListContainer');
+        const selectedAgentName = document.getElementById('selectedAgentName');
+        const currentAgentStatus = document.getElementById('currentAgentStatus');
+        
+        const addAgentBtn = document.getElementById('addAgentBtn');
+        const agentModal = document.getElementById('agentModal');
+        const cancelAgentBtn = document.getElementById('cancelAgentBtn');
+        const saveAgentBtn = document.getElementById('saveAgentBtn');
+        const agentNameInput = document.getElementById('agentNameInput');
+        const agentPromptInput = document.getElementById('agentPromptInput');
+        const agentIdInput = document.getElementById('agentIdInput');
+        const modalTitle = document.getElementById('modalTitle');
 
         let currentSessionId = 'default-session';
+        let currentAgentId = null;
+        let agentsData = [];
 
         mermaid.initialize({ startOnLoad: false, theme: 'default' });
 
         // 初始化
         async function init() {
             await loadModels();
+            await loadAgents();
             await loadSessionList();
             await loadSession(currentSessionId);
         }
+
+        async function loadAgents() {
+            try {
+                const res = await fetch('/api/agents');
+                agentsData = await res.json();
+                renderAgentList(agentsData);
+            } catch (e) {
+                console.error('Failed to load agents:', e);
+            }
+        }
+
+        function renderAgentList(agents) {
+            agentListContainer.innerHTML = '';
+            
+            // Standard AI (Default)
+            const defaultItem = document.createElement('div');
+            defaultItem.className = `flex items-center justify-between px-4 py-2 hover:bg-gray-50 cursor-pointer ${!currentAgentId ? 'bg-blue-50/50' : ''}`;
+            defaultItem.innerHTML = `
+                <div class="flex items-center gap-2 overflow-hidden">
+                    <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+                    <span class="text-xs font-medium text-gray-700 truncate">Standard AI</span>
+                </div>
+                ${!currentAgentId ? '<svg class="w-3.5 h-3.5 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>' : ''}
+            `;
+            defaultItem.onclick = () => selectAgent(null);
+            agentListContainer.appendChild(defaultItem);
+
+            agents.forEach(agent => {
+                const isSelected = currentAgentId === agent.id;
+                const item = document.createElement('div');
+                item.className = `flex items-center justify-between px-4 py-2 hover:bg-gray-50 cursor-pointer group/item ${isSelected ? 'bg-blue-50/50' : ''}`;
+                item.innerHTML = `
+                    <div class="flex items-center gap-2 overflow-hidden">
+                        <div class="w-2 h-2 rounded-full bg-indigo-500"></div>
+                        <span class="text-xs font-medium text-gray-700 truncate">${agent.name}</span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <button class="opacity-0 group-hover/item:opacity-100 p-1 hover:text-blue-500 transition-opacity" onclick="event.stopPropagation(); editAgent('${agent.id}', '${agent.name}', \`${agent.prompt.replace(/`/g, '\\`')}\`)">
+                            <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                        </button>
+                        <button class="opacity-0 group-hover/item:opacity-100 p-1 hover:text-red-500 transition-opacity" onclick="event.stopPropagation(); deleteAgent('${agent.id}')">
+                            <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                        ${isSelected ? '<svg class="w-3.5 h-3.5 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>' : ''}
+                    </div>
+                `;
+                item.onclick = () => selectAgent(agent.id);
+                agentListContainer.appendChild(item);
+            });
+        }
+
+        function selectAgent(id) {
+            currentAgentId = id;
+            const agent = agentsData.find(a => a.id === id);
+            selectedAgentName.innerText = agent ? agent.name : 'Standard AI';
+            currentAgentStatus.className = `w-2 h-2 rounded-full ${agent ? 'bg-indigo-500' : 'bg-emerald-500'}`;
+            agentDropdown.classList.add('hidden');
+            renderAgentList(agentsData);
+        }
+
+        // Toggle dropdown
+        agentSelectorBtn.onclick = (e) => {
+            e.stopPropagation();
+            agentDropdown.classList.toggle('hidden');
+        };
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', () => {
+            agentDropdown.classList.add('hidden');
+        });
+        
+        agentDropdown.onclick = (e) => e.stopPropagation();
+
+        function editAgent(id, name, prompt) {
+            agentIdInput.value = id;
+            agentNameInput.value = name;
+            agentPromptInput.value = prompt;
+            modalTitle.innerText = 'Edit Agent';
+            agentModal.classList.remove('hidden');
+        }
+
+        async function deleteAgent(id) {
+            if (!confirm('Are you sure you want to delete this agent?')) return;
+            try {
+                await fetch(`/api/agents/${id}`, { method: 'DELETE' });
+                if (currentAgentId === id) currentAgentId = null;
+                loadAgents();
+            } catch (e) { console.error(e); }
+        }
+
+        addAgentBtn.onclick = () => {
+            agentIdInput.value = '';
+            agentNameInput.value = '';
+            agentPromptInput.value = '';
+            modalTitle.innerText = 'Create New Agent';
+            agentModal.classList.remove('hidden');
+        };
+
+        cancelAgentBtn.onclick = () => agentModal.classList.add('hidden');
+
+        saveAgentBtn.onclick = async () => {
+            const name = agentNameInput.value.trim();
+            const prompt = agentPromptInput.value.trim();
+            const id = agentIdInput.value;
+
+            if (!name || !prompt) return alert('Name and Prompt are required');
+
+            try {
+                const res = await fetch('/api/agents', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, name, prompt })
+                });
+                if (res.ok) {
+                    agentModal.classList.add('hidden');
+                    loadAgents();
+                }
+            } catch (e) { console.error(e); }
+        };
 
         async function loadModels() {
             try {
@@ -315,7 +510,8 @@
                     body: JSON.stringify({
                         sessionId: currentSessionId,
                         userInput: text,
-                        modelId: modelSelect.value
+                        modelId: modelSelect.value,
+                        agentId: currentAgentId
                     })
                 });
 
