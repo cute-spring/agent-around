@@ -40,7 +40,7 @@
 
 ## 🛠️ 如何在代码中使用
 
-在 [6-mcp-amap.py](file:///Users/gavinzhang/ws-ai-recharge-2026/agent-around/py-pydantic-lab/examples/02-intermediate/6-mcp-amap.py) 中，你只需通过以下方式即可启用所有这些功能：
+在 [6-mcp-amap.py](./6-mcp-amap.py) 中，你只需通过以下方式即可启用所有这些功能：
 
 ```python
 server = MCPServerStdio(

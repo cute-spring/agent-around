@@ -34,7 +34,7 @@ graph LR
 在 Stdio 模式下，环境变量是“**注入式**”的。
 - **获取逻辑**：MCP 服务器作为一个子进程，继承父进程（Agent）的 `os.environ`。
 - **配置示例**：
-  在 [5-mcp-weread.py](file:///Users/gavinzhang/ws-ai-recharge-2026/agent-around/py-pydantic-lab/examples/02-intermediate/5-mcp-weread.py) 中，通过 `env_keys` 显式指定需要透传的变量（如 `WEREAD_COOKIE`）。
+  在 [5-mcp-weread.py](./5-mcp-weread.py) 中，通过 `env_keys` 显式指定需要透传的变量（如 `WEREAD_COOKIE`）。
 - **风险点**：本地 `.env` 文件可能包含敏感信息，若不慎将整个环境变量导出给不受信任的工具，存在泄漏风险。
 
 ### **Remote：身份鉴权模式**
